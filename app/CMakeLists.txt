@@ -14,11 +14,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # Gradle automatically packages shared libraries with your APK.
 
 file(GLOB source_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*.cpp")
+
+file(GLOB egl_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/egl_core/*.cpp")
 add_library( # Sets the name of the library.
         native-lib
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
+        ${egl_dir}
         ${source_dir})
 
 
