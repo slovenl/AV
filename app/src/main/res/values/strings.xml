@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">My Application</string>
+
+    <string name="tfcCameraParams">Camera params: %1$dx%2$d @%3$.1f fps</string>
+    <string name="tfcRectSize">Rect size (pixels): %1$dx%2$d</string>
+    <string name="tfcZoomArea">Zoom area (pixels): %1$dx%2$d</string>
+    <string name="tfcZoomLabel">Zoom: </string>
+    <string name="tfcSizeLabel">Size: </string>
+    <string name="tfcRotateLabel">Rotate: </string>
+</resources>
