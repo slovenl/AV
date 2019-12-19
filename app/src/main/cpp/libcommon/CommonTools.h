@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
@@ -67,7 +68,7 @@ static inline int getIndexOfMaxValueInArray(long* array, int length) {
 	return result;
 }
 
-static inline bool isAACSuffix(const char* accompanyPath){
+static inline bool isAACSuffix(char* accompanyPath){
 	bool ret = false;
 	char *suffix = strrchr(accompanyPath, '.');
 //	LOGI("suffix is %s", suffix);
@@ -77,7 +78,7 @@ static inline bool isAACSuffix(const char* accompanyPath){
 	return ret;
 }
 
-static inline bool isPNGSuffix(const char* picFilePath){
+static inline bool isPNGSuffix(char* picFilePath){
 	bool ret = false;
 	char *suffix = strrchr(picFilePath, '.');
 //	LOGI("suffix is %s", suffix);
