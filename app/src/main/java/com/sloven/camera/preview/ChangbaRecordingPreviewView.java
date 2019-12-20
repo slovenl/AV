@@ -26,7 +26,7 @@ public class ChangbaRecordingPreviewView extends SurfaceView implements Callback
 	}
 
 	public void surfaceChanged(SurfaceHolder holder, int format, int width,
-                               int height) {
+			int height) {
 		if(null != mCallback){
 			mCallback.resetRenderSize(width, height);
 		}

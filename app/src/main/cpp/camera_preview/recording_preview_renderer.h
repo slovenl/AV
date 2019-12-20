@@ -1,11 +1,13 @@
 #ifndef RECORDING_PREVIEW_RENDERER_H
 #define RECORDING_PREVIEW_RENDERER_H
 
-#include "../libcommon/opengl_media/render/video_gl_surface_render.h"
-#include "../libcommon/opengl_media/texture/gpu_texture_frame.h"
-#include "../libcommon/opengl_media/texture_copier/gpu_texture_frame_copier.h"
-#include "../libcommon/CommonTools.h"
-#include "../libcommon/egl_core/gl_tools.h"
+#include "opengl_media/render/video_gl_surface_render.h"
+#include "opengl_media/texture/gpu_texture_frame.h"
+#include "opengl_media/texture_copier/gpu_texture_frame_copier.h"
+#include "CommonTools.h"
+#include "egl_core/gl_tools.h"
+
+#include "../libeditcore/video_effect_processor.h"
 
 #define PREVIEW_FILTER_SEQUENCE_IN									0
 #define PREVIEW_FILTER_SEQUENCE_OUT									10 * 60 * 60 * 1000000
@@ -58,9 +60,14 @@ public:
     void drawToViewWithAutofit(int videoWidth, int videoHeight, int texWidth, int texHeight);
     void dealloc();
 
+    virtual bool setFilter(int filterType, byte* mACVBuffer, int mACVBufferSize);
+
+    void releasePausedState();
+    bool preparePausedState();
+
     int getCameraTexId();
 
-    GLuint getOutputTexId(){
+    GLuint getOutputTexId() {
     		return outputTexId;
     };
 	GLuint getInputTexId() {
@@ -78,12 +85,16 @@ protected:
     GLuint outputTexId;
     //用于旋转的纹理id
     GLuint rotateTexId;
+	OpenglVideoFrame* 		sourceVideoFrame;
+	OpenglVideoFrame* 		targetVideoFrame;
 	//暂停状态下的保留的那一帧Texture
     GLuint pausedTexId;
     //暂停的时候增加的FilterId 当切换为普通预览的时候需要去掉
     int mixFilterId;
     /** 1:把Camera的纹理拷贝到inputTexId **/
     GPUTextureFrameCopier* mCopier;
+    /** 2:把inputTexId处理到outputTexId **/
+    VideoEffectProcessor* mProcessor;
     /** 3:把outputTexId渲染到View上 **/
     VideoGLSurfaceRender* mRenderer;
 
@@ -96,6 +107,16 @@ protected:
     int textureHeight;
     int cameraWidth;
     int cameraHeight;
+
+    int addFilter(int filterType, byte* mACVBuffer, int mACVBufferSize);
+    void setToneCurveFilterValue(int filterId, byte* mACVBuffer, int mACVBufferSize);
+    void setWhiteningFilterValue(int filterId,
+    		float amplitude, float edger, float radiusFactor,
+    		float softLightBlendR, float softLightBlendG, float softLightBlendB, float softLightBlendA,
+    		float hueAngle);
+    void setBeautifyFaceFilterValue(int filterId, float maskCurveProgress, float softLightProgress,
+    		float sCurveProgress, float hueAngle, float sharpness, float satuRatio);
+    void setFilterZoomRatioValue(int filterId);
 
     void fillTextureCoords();
     float flip(float i);

@@ -192,8 +192,8 @@ public class ChangbaVideoCamera {
 //			parameters.setRecordingHint(true);
 
 			// 4、设置视频记录的连续自动对焦模式
-			if (parameters.getSupportedFocusModes().contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
-				parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+			if (parameters.getSupportedFocusModes().contains(Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
+				parameters.setFocusMode(Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
 			}
 
 			try {
@@ -255,7 +255,7 @@ public class ChangbaVideoCamera {
 		int result;
 		CameraInfo info = new CameraInfo();
 		Camera.getCameraInfo(cameraId, info);
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+		if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
 			result = 1;
 		} else { // back-facing
 			result = 0;
@@ -282,7 +282,7 @@ public class ChangbaVideoCamera {
 		int result;
 		CameraInfo info = new CameraInfo();
 		Camera.getCameraInfo(cameraId, info);
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+		if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
 			result = (info.orientation + degrees) % 360;
 		} else { // back-facing
 			result = (info.orientation - degrees + 360) % 360;
@@ -296,6 +296,8 @@ public class ChangbaVideoCamera {
 		public void onPermissionDismiss(String tip);
 		
 		public void notifyFrameAvailable();
+		
+		public void updateTexMatrix(float texMatrix[]);
 	}
 
 	public void setCallback(ChangbaVideoCameraCallback callback) {

@@ -1,4 +1,4 @@
-#include "./recording_preview_renderer.h"
+#include "recording_preview_renderer.h"
 
 #define LOG_TAG "RecordingPreviewRenderer"
 
@@ -8,6 +8,7 @@ RecordingPreviewRenderer::RecordingPreviewRenderer() {
 	mCopier = NULL;
 	textureCoords = NULL;
 	textureCoordsSize = 8;
+	mProcessor = NULL;
 	mRenderer = NULL;
 }
 
@@ -33,6 +34,8 @@ void RecordingPreviewRenderer::init(int degress, bool isVFlip, int textureWidth,
 
 	mCopier = new GPUTextureFrameCopier();
 	mCopier->init();
+	mProcessor = new VideoEffectProcessor();
+	mProcessor->init();
 	mRenderer = new VideoGLSurfaceRender();
 	mRenderer->init(textureWidth, textureHeight);
 	cameraTexFrame = new GPUTextureFrame();
@@ -79,6 +82,11 @@ void RecordingPreviewRenderer::init(int degress, bool isVFlip, int textureWidth,
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	//初始化sourceVideoFrame以及targetVideoFrame
+	ImagePosition imagePosition(0, 0, GLsizei(textureWidth), GLsizei(textureHeight));
+	sourceVideoFrame = new OpenglVideoFrame(inputTexId, imagePosition);
+	targetVideoFrame = new OpenglVideoFrame(outputTexId, imagePosition);
+
 	mixFilterId = -1;
 	glGenTextures(1, &pausedTexId);
 	checkGlError("glGenTextures pausedTexId");
@@ -90,7 +98,21 @@ void RecordingPreviewRenderer::init(int degress, bool isVFlip, int textureWidth,
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, (GLsizei) textureWidth, (GLsizei) textureHeight, 0, internalFormat, GL_UNSIGNED_BYTE, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	this->setFilter(0, NULL, 0);
+
 	LOGI("leave RecordingPreviewRenderer::init()");
+}
+
+bool RecordingPreviewRenderer::setFilter(int filterType, byte* mACVBuffer, int mACVBufferSize) {
+	bool ret = true;
+	mProcessor->removeAllFilters();
+	int filterId = this->addFilter(filterType, mACVBuffer, mACVBufferSize);
+	LOGI("add Filter %d", filterId);
+	if(filterId >= 0){
+		ret = mProcessor->invokeFilterOnReady(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId);
+	}
+	return ret;
 }
 
 void RecordingPreviewRenderer::processFrame(float position) {
@@ -112,15 +134,23 @@ void RecordingPreviewRenderer::processFrame(float position) {
 		rotateTexHeight = cameraWidth;
 	}
 	mRenderer->renderToAutoFitTexture(rotateTexId, rotateTexWidth, rotateTexHeight, inputTexId);
+	mProcessor->process(sourceVideoFrame, PREVIEW_FILTER_POSITION, targetVideoFrame);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void RecordingPreviewRenderer::drawToView(int videoWidth, int videoHeight) {
-	mRenderer->renderToView(inputTexId, videoWidth, videoHeight);
+	mRenderer->renderToView(outputTexId, videoWidth, videoHeight);
 }
 
 void RecordingPreviewRenderer::drawToViewWithAutofit(int videoWidth, int videoHeight, int texWidth, int texHeight) {
-	mRenderer->renderToViewWithAutofit(inputTexId, videoWidth, videoHeight, texWidth, texHeight);
+	mRenderer->renderToViewWithAutofit(outputTexId, videoWidth, videoHeight, texWidth, texHeight);
+}
+
+void RecordingPreviewRenderer::releasePausedState(){
+	if(mixFilterId >= 0){
+		mProcessor->removeFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, mixFilterId);
+		mixFilterId = -1;
+	}
 }
 
 int RecordingPreviewRenderer::getCameraTexId() {
@@ -130,6 +160,26 @@ int RecordingPreviewRenderer::getCameraTexId() {
 	return -1;
 }
 
+bool RecordingPreviewRenderer::preparePausedState(){
+	LOGI("enter RecordingPreviewRenderer::copyPausedTexture...");
+	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+	checkGlError("glBindFramebuffer FBO");
+	mRenderer->renderToTexture(outputTexId, pausedTexId);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	mixFilterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, MIX_FILTER_NAME);
+	if(mixFilterId >= 0){
+		ParamVal mixTexIdValue;
+		mixTexIdValue.u.intVal = pausedTexId;
+		mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, mixFilterId, MIX_FILTER_TEXTURE_ID, mixTexIdValue);
+		ParamVal mixProgressValue;
+		mixProgressValue.u.fltVal = 0.5f;
+		mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, mixFilterId, MIX_FILTER_MIX_PROGRESS, mixProgressValue);
+		return mProcessor->invokeFilterOnReady(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, mixFilterId);
+	}
+	LOGI("leave RecordingPreviewRenderer::copyPausedTexture...");
+	return false;
+}
+
 void RecordingPreviewRenderer::dealloc(){
 	LOGI("enter RecordingPreviewRenderer::dealloc()");
 	if(mCopier){
@@ -137,12 +187,20 @@ void RecordingPreviewRenderer::dealloc(){
 		delete mCopier;
 		mCopier = NULL;
 	}
-	if(mRenderer){
+	LOGI("after delete mCopier");
+	if(mProcessor){
+		mProcessor->dealloc();
+		delete mProcessor;
+		mProcessor = NULL;
+	}
+	LOGI("after delete mProcessor");
+	if(mRenderer) {
 		LOGI("delete mRenderer..");
 		mRenderer->dealloc();
 		delete mRenderer;
 		mRenderer = NULL;
 	}
+	LOGI("after delete mRenderer");
 	if (inputTexId) {
 		LOGI("delete inputTexId ..");
 		glDeleteTextures(1, &inputTexId);
@@ -159,11 +217,172 @@ void RecordingPreviewRenderer::dealloc(){
 		LOGI("delete FBO..");
 		glDeleteBuffers(1, &FBO);
 	}
+	if (NULL != targetVideoFrame) {
+		delete targetVideoFrame;
+		targetVideoFrame = NULL;
+	}
+	if (NULL != sourceVideoFrame) {
+		delete sourceVideoFrame;
+		sourceVideoFrame = NULL;
+	}
+
+	if (cameraTexFrame != NULL){
+		cameraTexFrame->dealloc();
+		delete cameraTexFrame;
+		cameraTexFrame = NULL;
+	}
+
 	if(textureCoords){
 		delete[] textureCoords;
 		textureCoords = NULL;
 	}
 	LOGI("leave RecordingPreviewRenderer::dealloc()");
+}
+
+int RecordingPreviewRenderer::addFilter(int filterType, byte* mACVBuffer, int mACVBufferSize) {
+	LOGI("MVRecordingPreviewController::getFilter type is %d", filterType);
+	int filterId = -1;
+	switch (filterType) {
+	case 10000:
+		//清凉
+        filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, BEAUTIFY_FACE_COOL_FILTER_NAME);
+		this->setBeautifyFaceFilterValue(filterId, 0.7, 1.0, 0.25, 359.0, 0.5, 0.9f);
+        this->setToneCurveFilterValue(filterId, mACVBuffer, mACVBufferSize);
+		this->setFilterZoomRatioValue(filterId);
+		break;
+	case 10001:
+		//瘦脸
+        filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, THIN_BEAUTIFY_FACE_FILTER_NAME);
+        this->setBeautifyFaceFilterValue(filterId, 0.7, 1.0, 0.25, 359.0, 0.5, 0.9f);
+        	this->setFilterZoomRatioValue(filterId);
+		break;
+	case 10003:
+		//自然
+        filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, BEAUTIFY_FACE_FILTER_NAME);
+        this->setBeautifyFaceFilterValue(filterId, 0.7, 1.0, 0.25, 359.0, 0.5, 0.9f);
+		this->setFilterZoomRatioValue(filterId);
+		break;
+	case 10004:
+		//美肤
+        filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, BEAUTIFY_FACE_FILTER_NAME);
+        this->setBeautifyFaceFilterValue(filterId, 0.65, 0.9, 0.2, 359.0, 0.5, 0.875f);
+		this->setFilterZoomRatioValue(filterId);
+		break;
+	case 10002:
+	default:
+		//无
+//        filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, BEAUTIFY_FACE_FILTER_NAME);
+//        this->setBeautifyFaceFilterValue(filterId, 0.85, 1.1, 0.2, 0.0, 0.5, 0.9f);
+//        	this->setFilterZoomRatioValue(filterId);
+        	filterId = mProcessor->addFilter(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, PREVIEW_FILTER_SEQUENCE_IN, PREVIEW_FILTER_SEQUENCE_OUT, IMAGE_BASE_EFFECT_NAME);
+    		this->setFilterZoomRatioValue(filterId);
+		break;
+	}
+	return filterId;
+}
+
+void RecordingPreviewRenderer::setToneCurveFilterValue(int filterId, byte* mACVBuffer, int mACVBufferSize) {
+	ParamVal changeFlagValue;
+	changeFlagValue.u.boolVal = true;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, TONE_CURVE_FILTER_ACV_BUFFER_CHANGED, changeFlagValue);
+	ParamVal acvBufferValue;
+	acvBufferValue.u.arbData = mACVBuffer;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, TONE_CURVE_FILTER_ACV_BUFFER, acvBufferValue);
+	ParamVal acvBufferSizeValue;
+	acvBufferSizeValue.u.intVal = mACVBufferSize;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, TONE_CURVE_FILTER_ACV_BUFFER_SIZE, acvBufferSizeValue);
+}
+
+void RecordingPreviewRenderer::setBeautifyFaceFilterValue(int filterId, float maskCurveProgress, float softLightProgress,
+		float sCurveProgress, float hueAngle, float sharpness, float satuRatio) {
+    ParamVal textureWidthValue;
+    textureWidthValue.u.intVal = textureWidth;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_TEXTURE_WIDTH, textureWidthValue);
+    ParamVal textureHeightValue;
+    textureHeightValue.u.intVal = textureHeight;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_TEXTURE_HEIGHT, textureHeightValue);
+    ParamVal smoothSkinEffectParamChangedValue;
+    smoothSkinEffectParamChangedValue.u.boolVal = true;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, SMOOTH_SKIN_EFFECT_PARAM_CHANGED, smoothSkinEffectParamChangedValue);
+    ParamVal maskCurveProgressValue;
+    maskCurveProgressValue.u.fltVal = maskCurveProgress;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, MASK_CURVE_PROGRESS, maskCurveProgressValue);
+    ParamVal softLightProgressValue;
+    softLightProgressValue.u.fltVal = softLightProgress;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, SOFT_LIGHT_PROGRESS, softLightProgressValue);
+    ParamVal sCurveProgressValue;
+    sCurveProgressValue.u.fltVal = sCurveProgress;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, S_CURVE_PROGRESS, sCurveProgressValue);
+    ParamVal satuRatioValue;
+    satuRatioValue.u.fltVal = satuRatio;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, SATU_RATIO, satuRatioValue);
+    ParamVal hueAngleChangedValue;
+    hueAngleChangedValue.u.boolVal = true;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, HUE_EFFECT_HUE_ANGLE_CHANGED, hueAngleChangedValue);
+    ParamVal hueAngleValue;
+    hueAngleValue.u.fltVal = hueAngle;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, HUE_EFFECT_HUE_ANGLE, hueAngleValue);
+    ParamVal sharpnessValue;
+    sharpnessValue.u.fltVal = sharpness;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, SHARPEN_EFFECT_SHARPNESS, sharpnessValue);
+    ParamVal groupEffectWidthValue;
+    groupEffectWidthValue.u.intVal = textureWidth;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, IMAGE_EFFECT_GROUP_TEXTURE_WIDTH, groupEffectWidthValue);
+    ParamVal groupEffectHeightValue;
+    groupEffectHeightValue.u.intVal = textureHeight;
+    mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, IMAGE_EFFECT_GROUP_TEXTURE_HEIGHT, groupEffectHeightValue);
+}
+
+void RecordingPreviewRenderer::setWhiteningFilterValue(int filterId,
+		float amplitude, float edger, float radiusFactor,
+		float softLightBlendR, float softLightBlendG, float softLightBlendB, float softLightBlendA,
+		float hueAngle) {
+	ParamVal textureWidthValue;
+	textureWidthValue.u.intVal = textureWidth;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_TEXTURE_WIDTH, textureWidthValue);
+	ParamVal textureHeightValue;
+	textureHeightValue.u.intVal = textureHeight;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_TEXTURE_HEIGHT, textureHeightValue);
+	ParamVal amplitudeValue;
+	amplitudeValue.u.fltVal = amplitude;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_AMPLITUDE, amplitudeValue);
+	ParamVal edgerValue;
+	edgerValue.u.fltVal = edger;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_FILTER_EDGER, edgerValue);
+	ParamVal radiusFactorValue;
+	radiusFactorValue.u.fltVal = radiusFactor;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_BILATERAL_RADIUS_FACTOR, radiusFactorValue);
+	ParamVal softLightBlendRValue;
+	softLightBlendRValue.u.fltVal = softLightBlendR;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_SOFT_LIGHT_BLEND_R, softLightBlendRValue);
+	ParamVal softLightBlendGValue;
+	softLightBlendGValue.u.fltVal = softLightBlendG;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_SOFT_LIGHT_BLEND_G, softLightBlendGValue);
+	ParamVal softLightBlendBValue;
+	softLightBlendBValue.u.fltVal = softLightBlendB;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_SOFT_LIGHT_BLEND_B, softLightBlendBValue);
+	ParamVal softLightBlendAValue;
+	softLightBlendAValue.u.fltVal = softLightBlendA;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, WHITENING_SOFT_LIGHT_BLEND_A, softLightBlendAValue);
+	ParamVal hueAngleChangedValue;
+	hueAngleChangedValue.u.boolVal = true;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, HUE_EFFECT_HUE_ANGLE_CHANGED, hueAngleChangedValue);
+	ParamVal hueAngleValue;
+	hueAngleValue.u.fltVal = hueAngle;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, HUE_EFFECT_HUE_ANGLE, hueAngleValue);
+	ParamVal groupEffectWidthValue;
+	groupEffectWidthValue.u.intVal = textureWidth;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, IMAGE_EFFECT_GROUP_TEXTURE_WIDTH, groupEffectWidthValue);
+	ParamVal groupEffectHeightValue;
+	groupEffectHeightValue.u.intVal = textureHeight;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, IMAGE_EFFECT_GROUP_TEXTURE_HEIGHT, groupEffectHeightValue);
+}
+
+
+void RecordingPreviewRenderer::setFilterZoomRatioValue(int filterId) {
+	ParamVal zoomRatioValue;
+	zoomRatioValue.u.fltVal = 0.95;
+	mProcessor->setFilterParamValue(EFFECT_PROCESSOR_VIDEO_TRACK_INDEX, filterId, IMAGE_EFFECT_ZOOM_VIEW_RATIO, zoomRatioValue);
 }
 
 void RecordingPreviewRenderer::fillTextureCoords() {
