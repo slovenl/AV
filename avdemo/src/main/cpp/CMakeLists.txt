@@ -13,26 +13,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-include_directories("src/main/jni/3rdparty/ffmpeg/include")
+# include_directories("src/main/jni/3rdparty/ffmpeg/include")
+find_library(log-lib log )
 
-file(GLOB source_dir "src/main/jni/*.cpp")
+file(GLOB egl_core "framework/egl_core/*.cpp")
+file(GLOB framework_root "framework/*.cpp")
 
-file(GLOB source_first_dir "src/main/jni/*/*.cpp")
-file(GLOB source_second_dir "/src/main/jni/*/*/*.cpp" )
-file(GLOB source_third_dir "src/main/jni/*/*/*/*.cpp")
-file(GLOB source_fouth_dir "src/main/jni/*/*/*/*/*.cpp")
-file(GLOB source_fouth_dir "src/main/jni/libeditcore/common/*.cpp")
+#file(GLOB source_first_dir "src/main/jni/*/*.cpp")
+
 #file(GLOB jni_dir "src/main/jni/*.cpp")
 add_library( # Sets the name of the library.
         native-lib
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        ${source_dir}
-        ${source_first_dir}
-        ${source_second_dir}
-        ${source_third_dir}
-        ${source_fouth_dir})
+        ${framework_root}
+        ${egl_core})
 
 
 # Searches for a specified prebuilt library and stores the path as a
@@ -51,8 +47,8 @@ target_link_libraries( # Specifies the target library.
 
         # Links the target library to the log library
         # included in the NDK.
+        ${log-lib}
         android
-        log
         EGL
-        OpenSLES
+#        OpenSLES
         GLESv2)
