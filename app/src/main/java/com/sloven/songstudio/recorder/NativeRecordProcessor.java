@@ -1,6 +1,6 @@
 package com.sloven.songstudio.recorder;
 
-import com.changba.songstudio.audioeffect.AudioEffect;
+import com.sloven.songstudio.audioeffect.AudioEffect;
 
 public class NativeRecordProcessor implements RecordProcessor {
 	private int handle;

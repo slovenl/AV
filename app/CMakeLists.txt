@@ -13,18 +13,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-file(GLOB source_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*.cpp")
-file(GLOB source_first_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*/*.cpp")
-file(GLOB source_second_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*/*/*.cpp")
-file(GLOB source_third_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*/*/*/*.cpp")
-file(GLOB source_fouth_dir "${CMAKE_SOURCE_DIR}/src/main/cpp/*/*/*/*/*.cpp")
+include_directories("src/main/jni/3rdparty/ffmpeg/include")
+
+file(GLOB source_dir "src/main/jni/*.cpp")
+file(GLOB source_first_dir "src/main/jni/*/*.cpp")
+file(GLOB source_second_dir "/src/main/jni/*/*/*.cpp" )
+file(GLOB source_third_dir "src/main/jni/*/*/*/*.cpp")
+file(GLOB source_fouth_dir "src/main/jni/*/*/*/*/*.cpp")
 #file(GLOB jni_dir "src/main/jni/*.cpp")
 add_library( # Sets the name of the library.
         native-lib
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        src/main/jni/ChangbaRecordingPreviewScheduler.cpp
         ${source_dir}
         ${source_first_dir}
         ${source_second_dir}

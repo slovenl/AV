@@ -1,7 +1,7 @@
 package com.sloven.songstudio.recording.video.service.factory;
 
+import com.sloven.camera.preview.ChangbaRecordingPreviewScheduler;
 import com.sloven.songstudio.recording.RecordingImplType;
-import com.sloven.songstudio.recording.camera.preview.ChangbaRecordingPreviewScheduler;
 import com.sloven.songstudio.recording.service.RecorderService;
 import com.sloven.songstudio.recording.service.impl.AudioRecordRecorderServiceImpl;
 import com.sloven.songstudio.recording.video.service.MediaRecorderService;

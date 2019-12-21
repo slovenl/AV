@@ -1,6 +1,6 @@
 package com.sloven.songstudio.decoder;
 
-import com.changba.songstudio.audioeffect.AudioEffect;
+import com.sloven.songstudio.audioeffect.AudioEffect;
 
 
 public class MusicDecoder implements Mp3Decoder {

@@ -2,7 +2,7 @@
 #include <jni.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
-#include "../libcamera_preview/mv_recording_preview_controller.h"
+#include "camera_preview/mv_recording_preview_controller.h"
 #include <sys/types.h>
 #include <android/asset_manager_jni.h>
 #include <android/asset_manager.h>

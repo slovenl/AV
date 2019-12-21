@@ -2,9 +2,9 @@ package com.sloven.songstudio.recording.video.service;
 
 import android.content.res.AssetManager;
 
+import com.sloven.camera.preview.CameraParamSettingException;
+import com.sloven.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.audioeffect.AudioEffect;
-import com.sloven.songstudio.recording.camera.exception.CameraParamSettingException;
-import com.sloven.songstudio.recording.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.recording.exception.AudioConfigurationException;
 import com.sloven.songstudio.recording.exception.StartRecordingException;
 

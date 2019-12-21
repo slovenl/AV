@@ -3,12 +3,12 @@ package com.sloven.songstudio.recording.video;
 import android.content.res.AssetManager;
 import android.util.Log;
 
+import com.sloven.camera.preview.CameraParamSettingException;
+import com.sloven.camera.preview.ChangbaRecordingPreviewScheduler;
+import com.sloven.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.Videostudio;
 import com.sloven.songstudio.audioeffect.AudioEffect;
 import com.sloven.songstudio.recording.RecordingImplType;
-import com.sloven.songstudio.recording.camera.exception.CameraParamSettingException;
-import com.sloven.songstudio.recording.camera.preview.ChangbaRecordingPreviewScheduler;
-import com.sloven.songstudio.recording.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.recording.exception.InitRecorderFailException;
 import com.sloven.songstudio.recording.exception.RecordingStudioException;
 import com.sloven.songstudio.recording.exception.StartRecordingException;

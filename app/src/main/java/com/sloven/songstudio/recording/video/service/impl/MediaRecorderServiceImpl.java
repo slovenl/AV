@@ -2,10 +2,10 @@ package com.sloven.songstudio.recording.video.service.impl;
 
 import android.content.res.AssetManager;
 
+import com.sloven.camera.preview.CameraParamSettingException;
+import com.sloven.camera.preview.ChangbaRecordingPreviewScheduler;
+import com.sloven.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.audioeffect.AudioEffect;
-import com.sloven.songstudio.recording.camera.exception.CameraParamSettingException;
-import com.sloven.songstudio.recording.camera.preview.ChangbaRecordingPreviewScheduler;
-import com.sloven.songstudio.recording.camera.preview.PreviewFilterType;
 import com.sloven.songstudio.recording.exception.AudioConfigurationException;
 import com.sloven.songstudio.recording.exception.StartRecordingException;
 import com.sloven.songstudio.recording.service.RecorderService;
@@ -22,7 +22,7 @@ public class MediaRecorderServiceImpl implements MediaRecorderService {
 		this.previewScheduler = scheduler;
 	}
 
-	public void switchCamera() throws CameraParamSettingException{
+	public void switchCamera() throws CameraParamSettingException {
 		previewScheduler.switchCameraFacing();
 	}
 	

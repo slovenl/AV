@@ -15,7 +15,7 @@ import android.view.Surface;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static com.changba.songstudio.recording.video.VideoRecordingStudio.MEDIA_CODEC_NOSIE_DELTA;
+import static com.sloven.songstudio.recording.video.VideoRecordingStudio.MEDIA_CODEC_NOSIE_DELTA;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 
@@ -202,7 +202,6 @@ public class MediaCodecSurfaceEncoder {
      * Drains all pending output from the decoder, and adds it to the circular
      * buffer.
      *
-     * @param outputData
      */
     public void drainEncoder() {
         mBufferInfo = new MediaCodec.BufferInfo();

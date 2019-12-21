@@ -1,6 +1,6 @@
 package com.sloven.songstudio.media;
 
-import com.changba.songstudio.audioeffect.AudioEffect;
+import com.sloven.songstudio.audioeffect.AudioEffect;
 
 public class SoundTrackController {
 	public interface OnCompletionListener{
