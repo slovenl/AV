@@ -28,9 +28,16 @@ public class ChangbaRecordingPreviewScheduler
     }
 
     public native void startEncoding(int width, int height, int videoBitRate, int frameRate, boolean useHardWareEncoding, int strategy);
-
     public native void stopEncoding();
+    private native void switchPreviewFilter(int value, AssetManager ass, String filename);
+     //预览状态、录制状态、暂停录制状态
+    public native void switchPauseRecordingPreviewState();
+    public native void switchCommonPreviewState();
+    //切换摄像头, 底层会在返回来调用configCamera, 之后在启动预览
+    public native void switchCameraFacing();
 
+
+    
     public int getNumberOfCameras() {
         if (null != mCamera) {
             return mCamera.getNumberOfCameras();
@@ -55,21 +62,6 @@ public class ChangbaRecordingPreviewScheduler
                 break;
         }
     }
-
-    private native void switchPreviewFilter(int value, AssetManager ass, String filename);
-
-    /**
-     * 预览状态、录制状态、暂停录制状态
-     **/
-    public native void switchPauseRecordingPreviewState();
-
-    public native void switchCommonPreviewState();
-
-    /**
-     * 切换摄像头, 底层会在返回来调用configCamera, 之后在启动预览
-     **/
-    public native void switchCameraFacing();
-
     private boolean isFirst = true;
     private boolean isSurfaceExsist = false;
     private boolean isStopped = false;

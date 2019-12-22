@@ -48,10 +48,14 @@ public class ChangbaVideoCamera {
 		return mCamera;
 	}
 
+	//c++层调用
+	//后置摄像头的id为0，前置为1，但还是需要使用CameraInfo.CAMERA_FACING_BACK  CameraInfo.CAMERA_FACING_FRONT两个常量来使用
 	public CameraConfigInfo configCameraFromNative(int cameraFacingId) {
+		//使用之前先释放
 		if (null != mCamera) {
 			releaseCamera();
 		}
+		//cameraID其实就是camera数量的index
 		if (cameraFacingId >= getNumberOfCameras()) {
 			cameraFacingId = 0;
 		}
@@ -148,11 +152,7 @@ public class ChangbaVideoCamera {
 		// printStackTrace(CameraLoader.class);
 		try {
 			// 1、开启Camera
-			try {
-				mCamera = getCameraInstance(id);
-			} catch (CameraParamSettingException e) {
-				throw e;
-			}
+			mCamera = getCameraInstance(id);
 			boolean mHasPermission = hasPermission();
 			if (!mHasPermission) {
 				throw new CameraParamSettingException("拍摄权限被禁用或被其他程序占用, 请确认后再录制");
@@ -161,6 +161,7 @@ public class ChangbaVideoCamera {
 
 			// 2、设置预览照片的图像格式
 			List<Integer> supportedPreviewFormats = parameters.getSupportedPreviewFormats();
+			//android相机默认采集的原始数据基本都是NV21格式的，并且是横向的
 			if (supportedPreviewFormats.contains(ImageFormat.NV21)) {
 				parameters.setPreviewFormat(ImageFormat.NV21);
 			} else {
@@ -282,6 +283,7 @@ public class ChangbaVideoCamera {
 		int result;
 		CameraInfo info = new CameraInfo();
 		Camera.getCameraInfo(cameraId, info);
+		// TODO: 2019/12/22 摄像头旋转角度探究
 		if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
 			result = (info.orientation + degrees) % 360;
 		} else { // back-facing

@@ -13,6 +13,7 @@ public class ChangbaRecordingPreviewView extends SurfaceView implements Callback
 		super(context);
 		SurfaceHolder surfaceHolder = getHolder();
 		surfaceHolder.addCallback(this);
+		//this is ignored, this value is set automatically when needed.
 		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 	}
 
