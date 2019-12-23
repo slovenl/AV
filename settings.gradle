@@ -1,3 +1,4 @@
 //include ':app'
-include ':openGLRender', ':ijkplayer'
-rootProject.name='AV'
+include ':openGLRender', ':libwlplayer'
+//include ':ijkplayer'
+rootProject.name = 'AV'
