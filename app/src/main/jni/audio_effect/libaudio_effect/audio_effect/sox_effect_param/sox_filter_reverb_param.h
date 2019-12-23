@@ -1,7 +1,7 @@
 #ifndef BASE_AUDIOEFFECT_SOX_REVERB_FILTER_H_
 #define BASE_AUDIOEFFECT_SOX_REVERB_FILTER_H_
 
-#include "../../../libcommon/CommonTools.h"
+#include "../../../../libcommon/CommonTools.h"
 
 class SOXReverbFilterParam {
 

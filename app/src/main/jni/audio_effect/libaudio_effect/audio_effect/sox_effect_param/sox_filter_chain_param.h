@@ -5,7 +5,7 @@
 #include "./sox_filter_compressor_param.h"
 #include "./sox_filter_equalizer_param.h"
 #include "./sox_filter_reverb_param.h"
-#include "../../../libcommon/CommonTools.h"
+#include "../../../../libcommon/CommonTools.h"
 #include <list>
 
 using namespace std;

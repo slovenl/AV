@@ -1,7 +1,7 @@
 #ifndef SOX_BASE_EFFECT_H_
 #define SOX_BASE_EFFECT_H_
 #include "../../audio_effect/sox_effect_param/sox_filter_chain_param.h"
-#include "../../../libcommon/CommonTools.h"
+#include "../../../../libcommon/CommonTools.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif

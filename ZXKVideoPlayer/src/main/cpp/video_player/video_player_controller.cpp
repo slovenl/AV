@@ -361,7 +361,7 @@ void VideoPlayerController::destroy() {
     LOGI("leave VideoPlayerController::destroy...");
 }
 
-static void *VideoPlayerController::initThreadCallback(void *myself) {
+void *VideoPlayerController::initThreadCallback(void *myself) {
     VideoPlayerController *controller = (VideoPlayerController *) myself;
     // 执行同步模块，解码
     controller->startAVSynchronizer();

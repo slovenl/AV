@@ -1,7 +1,7 @@
 #ifndef THEME_PARSER_H
 #define THEME_PARSER_H
 #include <unistd.h>
-#include "../../markup/Markup.h"
+#include "../../3rdparty/markup/Markup.h"
 #include "../platform_dependent/platform_common.h"
 #include "../common/video_effect_params.h"
 #include "../editmodel/model_timeline.h"

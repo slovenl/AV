@@ -1,6 +1,6 @@
 #ifndef LIVE_YUY2_PACKET_POOL_H
 #define LIVE_YUY2_PACKET_POOL_H
-#include "../../../liblivecore/common/live_video_packet_queue.h"
+#include "../../liblivecore/common/live_video_packet_queue.h"
 
 #define YUY2_PACKET_QUEUE_THRRESHOLD										45
 

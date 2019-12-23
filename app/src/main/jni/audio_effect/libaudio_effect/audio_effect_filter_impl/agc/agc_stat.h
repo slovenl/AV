@@ -1,7 +1,7 @@
 #ifndef CB_AGC_STAT_H
 #define CB_AGC_STAT_H
 
-#include "../../../libcommon/CommonTools.h"
+#include "../../../../libcommon/CommonTools.h"
 #define AGC_AUDIO_TYPE                0
 #define AGC_ACCOMPANY_TYPE            1
 #define AGC_AUDIO_VOLUME_RATE         0.9

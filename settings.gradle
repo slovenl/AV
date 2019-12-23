@@ -1,6 +1,6 @@
+include ':ZXKVideoPlayer'
 //include ':app'
 //include ':openGLRender'
-include ':ZXKVideoPlayer'
 //include ':libwlplayer'
 //include ':ijkplayer'
 rootProject.name = 'AV'

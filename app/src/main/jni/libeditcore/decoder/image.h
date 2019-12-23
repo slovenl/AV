@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../platform_dependent/platform_gl.h"
-#include "../../../3rdparty/libpng/png.h"
+#include "../../3rdparty/libpng/png.h"
 
 typedef struct {
 	const int width;

@@ -24,6 +24,7 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags ""
+                abiFilters 'armeabi-v7a'
             }
         }
     }
@@ -46,7 +47,7 @@ android {
                     cppFlags '-O3', '-fexceptions', '-fsigned-char',
                             "-frtti -std=c++11", '-Wformat'
 
-
+                    abiFilters 'armeabi-v7a'
                 }
             }
         }
@@ -63,7 +64,7 @@ android {
                     // 编译优化，设置函式是否能被 inline 的伪指令长度
                     cppFlags '-O3', '-fexceptions', '-fsigned-char',
                             "-frtti -std=c++11", '-Wformat'
-
+                    abiFilters 'armeabi-v7a'
                 }
             }
         }

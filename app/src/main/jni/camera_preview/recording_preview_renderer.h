@@ -1,11 +1,11 @@
 #ifndef RECORDING_PREVIEW_RENDERER_H
 #define RECORDING_PREVIEW_RENDERER_H
 
-#include "../../../libcommon/opengl_media/render/video_gl_surface_render.h"
-#include "../../../libcommon/opengl_media/texture/gpu_texture_frame.h"
-#include "../../../libcommon/opengl_media/texture_copier/gpu_texture_frame_copier.h"
-#include "../../../libcommon/CommonTools.h"
-#include "../../../libcommon/egl_core/gl_tools.h"
+#include "../libcommon/opengl_media/render/video_gl_surface_render.h"
+#include "../libcommon/opengl_media/texture/gpu_texture_frame.h"
+#include "../libcommon/opengl_media/texture_copier/gpu_texture_frame_copier.h"
+#include "../libcommon/CommonTools.h"
+#include "../libcommon/egl_core/gl_tools.h"
 
 #include "../libeditcore/video_effect_processor.h"
 

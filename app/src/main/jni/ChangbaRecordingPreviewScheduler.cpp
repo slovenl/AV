@@ -155,7 +155,7 @@ Java_com_sloven_camera_preview_ChangbaRecordingPreviewScheduler_updateTexMatrix(
         JNIEnv *env, jobject obj, jfloatArray array) {
     if (NULL != previewController) {
         jfloat *texMatrix;
-        texMatrix = env->GetFloatArrayElements(array, false);
+        texMatrix = env->GetFloatArrayElements(array, 0);
         previewController->updateTexMatrix(texMatrix);
         env->ReleaseFloatArrayElements(array, texMatrix, 0);
     }

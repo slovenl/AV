@@ -4,7 +4,7 @@
 #include "../libcommon/CommonTools.h"
 #include "../libcommon/opengl_media/render/video_gl_surface_render.h"
 #include "../libcommon/egl_core/egl_core.h"
-#include "../../../video_consumer/libvideo_consumer/live_common_packet_pool.h"
+#include "../video_consumer/libvideo_consumer/live_common_packet_pool.h"
 
 class VideoEncoderAdapter {
 public:
