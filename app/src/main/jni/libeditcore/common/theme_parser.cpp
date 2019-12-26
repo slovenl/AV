@@ -98,7 +98,7 @@ bool ThemeParser::readFilter(CMarkup& xmlParser, ModelTimeline* timeline, char* 
 			fillParamValue(strParamValue, strParamType, value, isAppendThemePath, themePath);
 			if(value.type == EffectParamTypePath){
 				const char* filePath = value.strVal.c_str();
-				if (isFileSuffix(filePath)) {
+				if (isFileSuffix(const_cast<char *>(filePath))) {
 					if ((access(filePath, F_OK)) == -1) {
 						ret = false;
 						return ret;

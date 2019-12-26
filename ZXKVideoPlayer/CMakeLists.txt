@@ -77,14 +77,14 @@ target_link_libraries(native-lib
         OpenSLES
         av-engine
         # 引入ffmpeg相关静态库
-        libavfilter.a
-        libavformat.a
-        libavcodec.a
-        libpostproc.a
-        libswresample.a
-        libswscale.a
-        libavutil.a
-        libfdk-aac.a
-        libvo-aacenc.a
-        libx264.a
+        libavfilter
+        libavformat
+        libavcodec
+        libpostproc
+        libswresample
+        libswscale
+        libavutil
+        libfdk-aac
+        libvo-aacenc
+        libx264
         )

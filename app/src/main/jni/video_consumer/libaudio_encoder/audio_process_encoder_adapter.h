@@ -1,9 +1,10 @@
 #ifndef AUDIO_PROCESS_ENCODER_ADAPTER_H
 #define AUDIO_PROCESS_ENCODER_ADAPTER_H
 
-#include "audio_encoder/audio_encoder_adapter.h"
-#include "libmusic_merger/music_merger.h"
-#include "libvideo_consumer/live_common_packet_pool.h"
+#include "../../liblivecore/audio_encoder/audio_encoder_adapter.h"
+#include "../../video_consumer/libmusic_merger/music_merger.h"
+#include "../../video_consumer/libvideo_consumer/live_common_packet_pool.h"
+#include "../../audio_effect/libaudio_effect/audio_effect/audio_effect.h"
 
 class AudioProcessEncoderAdapter: public AudioEncoderAdapter {
 public:

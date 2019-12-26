@@ -1,4 +1,5 @@
 include ':ZXKVideoPlayer'
+//include ':test'
 //include ':app'
 //include ':openGLRender'
 //include ':libwlplayer'
