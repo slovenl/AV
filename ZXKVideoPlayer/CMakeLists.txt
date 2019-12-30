@@ -37,35 +37,35 @@ add_library(native-lib
         ${FILES_JNI_LAYER}
         )
 
-add_library(libavfilter STATIC IMPORTED)
-set_target_properties(libavfilter PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavfilter.a)
-
-add_library(libavformat STATIC IMPORTED)
-set_target_properties(libavformat PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavformat.a)
-
-add_library(libavcodec STATIC IMPORTED)
-set_target_properties(libavcodec PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavcodec.a)
-
-add_library(libpostproc STATIC IMPORTED)
-set_target_properties(libpostproc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libpostproc.a)
-
-add_library(libswresample STATIC IMPORTED)
-set_target_properties(libswresample PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswresample.a)
-
-add_library(libswscale STATIC IMPORTED)
-set_target_properties(libswscale PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswscale.a)
-
-add_library(libavutil STATIC IMPORTED)
-set_target_properties(libavutil PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavutil.a)
-
-add_library(libfdk-aac STATIC IMPORTED)
-set_target_properties(libfdk-aac PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libfdk-aac.a)
-
-add_library(libvo-aacenc STATIC IMPORTED)
-set_target_properties(libvo-aacenc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libvo-aacenc.a)
-
-add_library(libx264 STATIC IMPORTED)
-set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libx264.a)
+#add_library(libavfilter STATIC IMPORTED)
+#set_target_properties(libavfilter PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavfilter.a)
+#
+#add_library(libavformat STATIC IMPORTED)
+#set_target_properties(libavformat PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavformat.a)
+#
+#add_library(libavcodec STATIC IMPORTED)
+#set_target_properties(libavcodec PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavcodec.a)
+#
+#add_library(libpostproc STATIC IMPORTED)
+#set_target_properties(libpostproc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libpostproc.a)
+#
+#add_library(libswresample STATIC IMPORTED)
+#set_target_properties(libswresample PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswresample.a)
+#
+#add_library(libswscale STATIC IMPORTED)
+#set_target_properties(libswscale PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswscale.a)
+#
+#add_library(libavutil STATIC IMPORTED)
+#set_target_properties(libavutil PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavutil.a)
+#
+#add_library(libfdk-aac STATIC IMPORTED)
+#set_target_properties(libfdk-aac PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libfdk-aac.a)
+#
+#add_library(libvo-aacenc STATIC IMPORTED)
+#set_target_properties(libvo-aacenc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libvo-aacenc.a)
+#
+#add_library(libx264 STATIC IMPORTED)
+#set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libx264.a)
 
 target_link_libraries(native-lib
         # 引入系统的动态库
@@ -77,14 +77,14 @@ target_link_libraries(native-lib
         OpenSLES
         av-engine
         # 引入ffmpeg相关静态库
-        libavfilter
-        libavformat
-        libavcodec
-        libpostproc
-        libswresample
-        libswscale
-        libavutil
-        libfdk-aac
-        libvo-aacenc
-        libx264
+#        libavfilter
+#        libavformat
+#        libavcodec
+#        libpostproc
+#        libswresample
+#        libswscale
+#        libavutil
+#        libfdk-aac
+#        libvo-aacenc
+#        libx264
         )

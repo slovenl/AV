@@ -11,7 +11,7 @@ VideoPlayerController *videoPlayerController = NULL;
 
 static ANativeWindow *window = 0;
 
-#define __cplusplus
+#ifdef __cplusplus
 extern "C" {
 
 JNIEXPORT jboolean JNICALL Java_com_changba_songstudio_video_player_ChangbaPlayer_prepare(
@@ -43,11 +43,10 @@ JNIEXPORT jboolean JNICALL Java_com_changba_songstudio_video_player_ChangbaPlaye
 
 JNIEXPORT void JNICALL
 Java_com_changba_songstudio_video_player_ChangbaPlayer_onSurfaceCreated(JNIEnv *env, jobject obj,
-                                                                        jobject surface, jint width,
-                                                                        jint height) {
+                                                                        jobject surface) {
     if (NULL != videoPlayerController) {
         window = ANativeWindow_fromSurface(env, surface);
-        videoPlayerController->onSurfaceCreated(window, width, height);
+        videoPlayerController->onSurfaceCreated(window, 0, 0);
     }
 }
 
