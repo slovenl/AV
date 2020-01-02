@@ -1,4 +1,5 @@
-include ':ZXKVideoPlayer'
+//include ':ZXKVideoPlayer'
+include ':encryption'
 //include ':test'
 //include ':app'
 //include ':openGLRender'
