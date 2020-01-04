@@ -34,7 +34,7 @@ void WangYiFFmpeg::prepareFFmpeg() {
     formatContext = avformat_alloc_context();
     //1、打开URL
     AVDictionary *opts = NULL;
-    //设置超时3秒
+    //设置超时3秒(单位us)
     av_dict_set(&opts, "timeout", "3000000", 0);
     //强制指定AVFormatContext中AVInputFormat的。这个参数一般情况下可以设置为NULL，这样FFmpeg可以自动检测AVInputFormat。
     //输入文件的封装格式
