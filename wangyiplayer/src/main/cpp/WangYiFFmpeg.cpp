@@ -53,7 +53,9 @@ void WangYiFFmpeg::prepareFFmpeg() {
     }
 
     for (int i = 0; i < formatContext->nb_streams; ++i) {
+        //获取解码器参数信息
         AVCodecParameters *codecpar = formatContext->streams[i]->codecpar;
+        //获取视频流信息
         AVStream *stream=formatContext->streams[i];
 
         //找到解码器
@@ -64,20 +66,20 @@ void WangYiFFmpeg::prepareFFmpeg() {
             }
             return;
         }
-        //创建上下文
+        //创建上下文，context3是版本升级的结果
         AVCodecContext *codecContext = avcodec_alloc_context3(dec);
         if (!codecContext) {
             if (javaCallHelper)
                 javaCallHelper->onError(THREAD_CHILD, FFMPEG_ALLOC_CODEC_CONTEXT_FAIL);
             return;
         }
-        //复制参数
+        //复制参数到解码上下文
         if (avcodec_parameters_to_context(codecContext, codecpar) < 0) {
             if (javaCallHelper)
                 javaCallHelper->onError(THREAD_CHILD, FFMPEG_CODEC_CONTEXT_PARAMETERS_FAIL);
             return;
         }
-        //打开解码器
+        //打开解码器，为什么这里判断！=0，ffmpeg中返回int类型的时候0都代表success，非0为错误码
         if (avcodec_open2(codecContext, dec, 0) != 0) {
             if (javaCallHelper)
                 javaCallHelper->onError(THREAD_CHILD, FFMPEG_OPEN_DECODER_FAIL);
