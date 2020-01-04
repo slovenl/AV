@@ -15,6 +15,7 @@ WangYiFFmpeg::WangYiFFmpeg(JavaCallHelper *javaCallHelper, const char *dataSourc
     url = new char[strlen(dataSource) + 1];
     this->javaCallHelper = javaCallHelper;
     strcpy(url, dataSource);
+    ANativeWindow
 }
 
 WangYiFFmpeg::~WangYiFFmpeg() {
