@@ -1,5 +1,6 @@
 //include ':ZXKVideoPlayer'
-include ':encryption'
+//include ':encryption'
+include ':wangyiplayer'
 //include ':test'
 //include ':app'
 //include ':openGLRender'
