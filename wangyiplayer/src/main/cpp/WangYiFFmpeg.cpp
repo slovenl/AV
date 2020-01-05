@@ -136,7 +136,8 @@ void WangYiFFmpeg::start() {
 void WangYiFFmpeg::play() {
     int ret = 0;
     while (isPlaying) {
-//        100帧
+        //限制队列长度，防止内存爆掉
+//        100帧,
         if (audioChannel && audioChannel->pkt_queue.size() > 100) {
 //            思想    队列    生产者的生产速度 远远大于消费者的速度  10ms   100packet     12ms  10ms
             av_usleep(1000 * 10);
