@@ -97,10 +97,35 @@ Java_com_darren_ndk_day01_SignatureUtils_signatureVerify(JNIEnv *env, jclass typ
     jstring j_signature_str = (jstring) env->CallObjectMethod(signatures_first, j_mid);
     const char * c_signature_str = env->GetStringUTFChars(j_signature_str,NULL);
     // 4. 比对签名是否一样
-    if (strcmp(c_signature_str, APP_SIGNATURE) != 0) {
-        return;
-    }
+//    if (strcmp(c_signature_str, APP_SIGNATURE) != 0) {
+//        return;
+//    }
     __android_log_print(ANDROID_LOG_ERROR,"JNI_TAG","签名校验成功: %s",c_signature_str);
     // 签名认证成功
     is_verify = 1;
+
+
+
+
+//    ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+//    NetworkInfo activeNetworkInfo = manager.getActiveNetworkInfo();
+//    String extraInfo = activeNetworkInfo.getExtraInfo();
+    jclass j_clazz;
+    jobject j_obj;
+    jmethodID j_method_id;
+
+    j_clazz = env->GetObjectClass(context);
+    j_method_id = env->GetMethodID(j_clazz,"getSystemService","(Ljava/lang/String)Landroid/net/ConnectivityManager;");
+    j_obj = env->CallObjectMethod(j_clazz, j_method_id, "connectivity");
+
+    j_clazz = env->GetObjectClass(j_obj);
+    j_method_id = env->GetMethodID(j_clazz,"getActiveNetworkInfo","()Landroid/net/NetworkInfo;");
+    j_obj = env->CallObjectMethod(j_clazz, j_method_id);
+
+    j_clazz = env->GetObjectClass(j_obj);
+    j_method_id = env->GetMethodID(j_clazz,"getExtraInfo","()Ljava/lang/String;");
+    jstring wifi_name = (jstring) env->CallObjectMethod(j_clazz, j_method_id);
+
+    const char *chars = env->GetStringUTFChars(wifi_name, NULL);
+    __android_log_print(ANDROID_LOG_ERROR,"JNI_TAG","签名校验成功: %s",chars);
 }
