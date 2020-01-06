@@ -15,7 +15,7 @@ import com.wangyi.palyerwangyi.player.WangyiPlayer;
 
 import java.io.File;
 
-public class MainActivity extends Activity implements SeekBar.OnSeekBarChangeListener {
+public class MainActivity extends Activity implements SeekBar.OnSeekBarChangeListener, WangyiPlayer.OnProgressListener {
 
 
     WangyiPlayer wangyiPlayer;
@@ -35,10 +35,20 @@ public class MainActivity extends Activity implements SeekBar.OnSeekBarChangeLis
         wangyiPlayer.setSurfaceView(surfaceView);
         File file = new File(Environment.getExternalStorageDirectory(), "input2.mp4");
         wangyiPlayer.setDataSource(file.getAbsolutePath());
+        wangyiPlayer.setOnProgressListener(this);
         wangyiPlayer.setOnPrepareListener(new WangyiPlayer.OnPrepareListener() {
             @Override
             public void onPrepared() {
                 wangyiPlayer.start();
+                final int duration = wangyiPlayer.getDuration();
+                Log.i("slvoen", "onPrepared: " + duration);
+                seekBar.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        seekBar.setMax(duration);
+                        seekBar.setVisibility(View.VISIBLE);
+                    }
+                });
             }
         });
 
@@ -75,15 +85,36 @@ public class MainActivity extends Activity implements SeekBar.OnSeekBarChangeLis
 
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
-
+//        isSeeking = true;
     }
 
+    boolean isSeeking = false;
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
-
+        int progress = seekBar.getProgress();
+        wangyiPlayer.seek(progress);
+        isSeeking = true;
     }
 
     public void play(View view) {
         wangyiPlayer.prepare();
+    }
+
+    @Override
+    public void onProgress(final int progress) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (!isSeeking) {
+                    isSeeking = false;
+                }
+                seekBar.setProgress(progress);
+            }
+        });
+    }
+
+    public void stop(View view) {
+        wangyiPlayer.stop();
+        wangyiPlayer.release();
     }
 }

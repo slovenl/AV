@@ -2,20 +2,25 @@
 #include <string>
 #include <android/native_window_jni.h>
 #include "JavaCallHelper.h"
-extern  "C"{
+
+extern "C" {
 #include "libavcodec/avcodec.h"
 }
 JavaCallHelper *javaCallHelper;
+
 #include "WangYiFFmpeg.h"
+
 ANativeWindow *window = 0;
 WangYiFFmpeg *wangYiFFmpeg;
 
 //线程  ----》javaVM
 JavaVM *javaVM = NULL;
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     javaVM = vm;
     return JNI_VERSION_1_4;
 }
+
 void renderFrame(uint8_t *data, int linesize, int w, int h) {
 //    渲染
     //设置窗口属性
@@ -39,6 +44,7 @@ void renderFrame(uint8_t *data, int linesize, int w, int h) {
     }
     ANativeWindow_unlockAndPost(window);
 }
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1prepare(JNIEnv *env, jobject instance,
@@ -71,5 +77,48 @@ Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1set_1surface(JNIEnv *en
     }
 //创建新的窗口用于视频显示
     window = ANativeWindow_fromSurface(env, surface);
+}
 
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1getDuration(JNIEnv *env, jobject thiz) {
+    if (wangYiFFmpeg) {
+        int duration = wangYiFFmpeg->getDuration();
+        return duration;
+    }
+    return 0;
+
+}extern "C"
+JNIEXPORT void JNICALL
+Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1seek(JNIEnv *env, jobject thiz,
+                                                              jint position) {
+    if (wangYiFFmpeg) {
+        wangYiFFmpeg->seek(position);
+    }
+
+
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1stop(JNIEnv *env, jobject thiz) {
+    if (wangYiFFmpeg) {
+        wangYiFFmpeg->stop();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_wangyi_palyerwangyi_player_WangyiPlayer_native_1release(JNIEnv *env, jobject thiz) {
+
+    if(window) {
+        ANativeWindow_release(window);
+        window = 0;
+    };
+//    if (javaCallHelper) {
+//        delete javaCallHelper;
+//    }
+//    if (wangYiFFmpeg) {
+//        delete wangYiFFmpeg;
+//    }
 }

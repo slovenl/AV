@@ -204,7 +204,15 @@ int AudioChannel::getPcm() {
 
         break;
     }
+    if (javaCallHelper) {
+        javaCallHelper->onProgress(THREAD_CHILD, clock);
+    }
+
     releaseAvFrame(frame);
     return data_size;
 
+}
+
+AudioChannel::~AudioChannel() {
+    free(buffer);
 }

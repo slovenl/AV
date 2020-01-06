@@ -10,6 +10,7 @@ public class WangyiPlayer implements SurfaceHolder.Callback {
     }
     private String dataSource;
     private native void native_prepare(String dataSource);
+    private native int native_getDuration();
     private native void native_start();
     private native void native_set_surface(Surface surface);
     private SurfaceHolder surfaceHolder;
@@ -39,6 +40,17 @@ public class WangyiPlayer implements SurfaceHolder.Callback {
     public void prepare() {
         native_prepare(dataSource);
     }
+
+    public void seek(final int position) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                native_seek(position);
+            }
+        }).start();
+    }
+
+    private native void native_seek(int position);
 
     public void setDataSource(String dataSource) {
         this.dataSource = dataSource;
@@ -86,6 +98,22 @@ public class WangyiPlayer implements SurfaceHolder.Callback {
     public void start() {
         native_start();
     }
+
+    public int getDuration() {
+        return native_getDuration();
+    }
+
+    public void stop() {
+        native_stop();
+    }
+
+    private native void native_stop();
+
+    public void release() {
+        native_release();
+    }
+
+    private native void native_release();
 
     public interface OnPrepareListener {
         void onPrepared();

@@ -15,11 +15,14 @@ WangYiFFmpeg::WangYiFFmpeg(JavaCallHelper *javaCallHelper, const char *dataSourc
     url = new char[strlen(dataSource) + 1];
     this->javaCallHelper = javaCallHelper;
     strcpy(url, dataSource);
-    ANativeWindow
+    duration = 0;
+    pthread_mutex_init(&mutex, NULL);
 }
 
 WangYiFFmpeg::~WangYiFFmpeg() {
-
+    pthread_mutex_destroy(&mutex);
+    javaCallHelper = 0;
+    DELETE(url);
 }
 
 void WangYiFFmpeg::prepare() {
@@ -52,7 +55,7 @@ void WangYiFFmpeg::prepareFFmpeg() {
         }
         return;
     }
-
+    duration = formatContext->duration / 1000000;
     for (int i = 0; i < formatContext->nb_streams; ++i) {
         //获取解码器参数信息
         AVCodecParameters *codecpar = formatContext->streams[i]->codecpar;
@@ -183,6 +186,74 @@ void WangYiFFmpeg::play() {
 
 void WangYiFFmpeg::setRenderCallback(RenderFrame renderFrame) {
     this->renderFrame = renderFrame;
+}
+
+int WangYiFFmpeg::getDuration() {
+    return duration;
+}
+
+void WangYiFFmpeg::seek(int position) {
+    if (position < 0 || position > duration) {
+        return;
+    }
+
+    if (!formatContext) {
+        return;
+    }
+
+    pthread_mutex_lock(&mutex);
+    av_seek_frame(formatContext, -1,position * 1000000, AVSEEK_FLAG_BACKWARD);
+
+    if (audioChannel) {
+        audioChannel->stopWork();
+        audioChannel->clear();
+        audioChannel->startWork();
+    }
+
+    if (videoChannel) {
+        videoChannel->stopWork();
+        videoChannel->clear();
+        videoChannel->startWork();
+    }
+    pthread_mutex_unlock(&mutex);
+}
+
+void *async_stop(void *args) {
+
+    WangYiFFmpeg *fFmpeg = static_cast<WangYiFFmpeg *>(args);
+    pthread_join(fFmpeg->pid_prepare, NULL);
+    fFmpeg->isPlaying = 0;
+    pthread_join(fFmpeg->pid_play, NULL);
+    if (fFmpeg->audioChannel) {
+        fFmpeg->audioChannel->stopWork();
+        fFmpeg->audioChannel->clear();
+    }
+
+    if (fFmpeg->videoChannel) {
+        fFmpeg->videoChannel->stopWork();
+        fFmpeg->videoChannel->clear();
+    }
+    DELETE(fFmpeg->audioChannel);
+    DELETE(fFmpeg->videoChannel);
+    if (fFmpeg->formatContext) {
+        avformat_close_input(&fFmpeg->formatContext);
+        avformat_free_context(fFmpeg->formatContext);
+        fFmpeg->formatContext = NULL;
+    }
+    DELETE(fFmpeg);
+    return 0;
+}
+
+void WangYiFFmpeg::stop() {
+    javaCallHelper = 0;
+    if (audioChannel) {
+        audioChannel->javaCallHelper = 0;
+    }
+    isPlaying = 0;
+    if (videoChannel) {
+        videoChannel->javaCallHelper = 0;
+    }
+    pthread_create(&pid_stop, NULL, async_stop, this);
 }
 
 
