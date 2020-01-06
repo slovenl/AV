@@ -12,6 +12,7 @@ JavaCallHelper *javaCallHelper;
 
 ANativeWindow *window = 0;
 WangYiFFmpeg *wangYiFFmpeg;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 //线程  ----》javaVM
 JavaVM *javaVM = NULL;
@@ -22,6 +23,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 }
 
 void renderFrame(uint8_t *data, int linesize, int w, int h) {
+    pthread_mutex_lock(&mutex);
+    if (!window) {
+        pthread_mutex_unlock(&mutex);
+        return;
+    }
 //    渲染
     //设置窗口属性
     ANativeWindow_setBuffersGeometry(window, w,
@@ -32,6 +38,7 @@ void renderFrame(uint8_t *data, int linesize, int w, int h) {
     if (ANativeWindow_lock(window, &window_buffer, 0)) {
         ANativeWindow_release(window);
         window = 0;
+        pthread_mutex_unlock(&mutex);
         return;
     }
 //    缓冲区  window_data[0] =255;
@@ -43,6 +50,7 @@ void renderFrame(uint8_t *data, int linesize, int w, int h) {
         memcpy(window_data + i * window_linesize, src_data + i * linesize, window_linesize);
     }
     ANativeWindow_unlockAndPost(window);
+    pthread_mutex_unlock(&mutex);
 }
 
 extern "C"

@@ -62,7 +62,7 @@ void VideoChannel::play() {
 }
 
 void VideoChannel::stop() {
-
+    isPlaying = 0;
 }
 
 void VideoChannel::decodePacket() {

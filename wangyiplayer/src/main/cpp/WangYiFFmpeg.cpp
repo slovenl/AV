@@ -227,11 +227,13 @@ void *async_stop(void *args) {
     if (fFmpeg->audioChannel) {
         fFmpeg->audioChannel->stopWork();
         fFmpeg->audioChannel->clear();
+        fFmpeg->audioChannel->stop();
     }
 
     if (fFmpeg->videoChannel) {
         fFmpeg->videoChannel->stopWork();
         fFmpeg->videoChannel->clear();
+        fFmpeg->videoChannel->stop();
     }
     DELETE(fFmpeg->audioChannel);
     DELETE(fFmpeg->videoChannel);

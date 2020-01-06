@@ -115,6 +115,6 @@ public class MainActivity extends Activity implements SeekBar.OnSeekBarChangeLis
 
     public void stop(View view) {
         wangyiPlayer.stop();
-        wangyiPlayer.release();
+//        wangyiPlayer.release();
     }
 }

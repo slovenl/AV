@@ -34,7 +34,7 @@ void AudioChannel::play() {
 }
 
 void AudioChannel::stop() {
-
+    isPlaying = 0;
 }
 
 AudioChannel::AudioChannel(int id, JavaCallHelper *javaCallHelper, AVCodecContext *avCodecContext ,AVRational time_base)
