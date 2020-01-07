@@ -9,4 +9,5 @@ include ':WangYiPlayer'   //网易ndk-player
 //include ':openGLRender'
 //include ':libwlplayer'
 //include ':ijkplayer'
+include ':webrtc_ns'  //webrtc噪声抑制模块
 rootProject.name = 'AV'
