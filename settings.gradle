@@ -2,12 +2,12 @@
 //include ':encryption'
 //include ':wangyiplayer'
 //include ':udemyplayer'   //
-include ':WangYiPlayer'   //网易ndk-player
+//include ':WangYiPlayer'   //网易ndk-player
 //include ':WangYiPush'   //网易ndk推流demo
 //include ':test'
 //include ':app'
 //include ':openGLRender'
 //include ':libwlplayer'
-//include ':ijkplayer'
-include ':webrtc_ns'  //webrtc噪声抑制模块
+include ':ijkplayer'
+//include ':webrtc_ns'  //webrtc噪声抑制模块
 rootProject.name = 'AV'
