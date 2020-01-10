@@ -1,7 +1,7 @@
 //include ':ZXKVideoPlayer'
 //include ':encryption'
 //include ':wangyiplayer'
-//include ':udemyplayer'   //
+include ':udemyplayer'   //
 //include ':WangYiPlayer'   //网易ndk-player
 //include ':WangYiPush'   //网易ndk推流demo
 //include ':test'

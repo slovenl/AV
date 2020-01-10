@@ -11,6 +11,8 @@
 
 #include "IDemux.h"
 #include <mutex>
+
+//指针声明即可，不需要引入ffmpeg的头文件
 struct AVFormatContext;
 
 class FFDemux: public IDemux {
@@ -34,6 +36,7 @@ public:
     FFDemux();
 
 private:
+    //初始化值，无参数构造函数才会生效，有参构造函数无效，c++11的bug？特性？
     AVFormatContext *ic = 0;
     std::mutex mux;
     int audioStream = 1;

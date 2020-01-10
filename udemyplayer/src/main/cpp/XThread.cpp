@@ -12,6 +12,7 @@
 using namespace std;
 void XSleep(int mis)
 {
+    //?什么鬼
     chrono::milliseconds du(mis);
     this_thread::sleep_for(du);
 }
@@ -36,6 +37,7 @@ bool XThread::Start()
     isExit = false;
     isPause = false;
     thread th(&XThread::ThreadMain,this);
+    //当前线程放弃对创建的线程的控制
     th.detach();
     return true;
 }
