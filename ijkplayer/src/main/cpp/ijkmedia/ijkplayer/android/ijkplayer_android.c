@@ -33,14 +33,17 @@
 
 IjkMediaPlayer *ijkmp_android_create(int(*msg_loop)(void*))
 {
+    // 创建播放器
     IjkMediaPlayer *mp = ijkmp_create(msg_loop);
     if (!mp)
         goto fail;
 
+    //创建videoOutPut模块：图像渲染相关
     mp->ffplayer->vout = SDL_VoutAndroid_CreateForAndroidSurface();
     if (!mp->ffplayer->vout)
         goto fail;
 
+    //平台相关的IJKFF_Pipeline对象，包括视频解码以及音频输出部分
     mp->ffplayer->pipeline = ffpipeline_create_from_android(mp->ffplayer);
     if (!mp->ffplayer->pipeline)
         goto fail;

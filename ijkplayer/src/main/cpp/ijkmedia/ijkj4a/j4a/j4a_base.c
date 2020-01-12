@@ -25,6 +25,7 @@
  * Exception Handle
  ********************/
 
+/*不进行异常处理，*/
 bool J4A_ExceptionCheck__throwAny(JNIEnv *env)
 {
     if ((*env)->ExceptionCheck(env)) {
@@ -35,10 +36,14 @@ bool J4A_ExceptionCheck__throwAny(JNIEnv *env)
     return false;
 }
 
+/*如果出现异常，则输出错误堆栈信息，清空异常*/
 bool J4A_ExceptionCheck__catchAll(JNIEnv *env)
 {
+    //检查是否有异常
     if ((*env)->ExceptionCheck(env)) {
+        //异常的堆栈信息
         (*env)->ExceptionDescribe(env);
+        //清理一个刚刚发生的异常
         (*env)->ExceptionClear(env);
         return true;
     }

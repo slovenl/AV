@@ -13,6 +13,7 @@
 #include "XThread.h"
 #include "XParameter.h"
 
+//只是声明即可，外部调用不需要关心头文件依赖
 class IDemux;
 class IAudioPlay;
 class IVideoView;

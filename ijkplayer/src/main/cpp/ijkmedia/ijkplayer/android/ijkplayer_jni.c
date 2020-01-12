@@ -750,11 +750,16 @@ static void
 IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 {
     MPTRACE("%s\n", __func__);
+    //创建播放器
     IjkMediaPlayer *mp = ijkmp_android_create(message_loop);
     JNI_CHECK_GOTO(mp, env, "java/lang/OutOfMemoryError", "mpjni: native_setup: ijkmp_create() failed", LABEL_RETURN);
 
+    //把创建出的播放器设置到IjkMediaPlayer.java中的mNativeMediaPlayer成员变量，让上层持有播放器句柄，但是上层基本没怎么用
     jni_set_media_player(env, thiz, mp);
+    //weak_this 为java层IjkMediaPlayer的弱引用
     ijkmp_set_weak_thiz(mp, (*env)->NewGlobalRef(env, weak_this));
+
+    //其他各模块持有java层引用
     ijkmp_set_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_set_ijkio_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_android_set_mediacodec_select_callback(mp, mediacodec_select_callback, ijkmp_get_weak_thiz(mp));

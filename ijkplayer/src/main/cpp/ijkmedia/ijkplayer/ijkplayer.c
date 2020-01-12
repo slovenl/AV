@@ -311,20 +311,24 @@ void ijkmp_shutdown(IjkMediaPlayer *mp)
     return ijkmp_shutdown_l(mp);
 }
 
+/*increase reference*/
 void ijkmp_inc_ref(IjkMediaPlayer *mp)
 {
     assert(mp);
+    //无锁原子操作，先返回，&mp->ref_count再+1
     __sync_fetch_and_add(&mp->ref_count, 1);
 }
 
+/*decrease reference*/
 void ijkmp_dec_ref(IjkMediaPlayer *mp)
 {
     if (!mp)
         return;
-
+    //无锁原子操作，&mp->ref_count先-1，再返回
     int ref_count = __sync_sub_and_fetch(&mp->ref_count, 1);
     if (ref_count == 0) {
         MPTRACE("ijkmp_dec_ref(): ref=0\n");
+        //如果引用计数为0则做销毁操作
         ijkmp_shutdown(mp);
         ijkmp_destroy_p(&mp);
     }
