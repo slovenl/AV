@@ -52,6 +52,9 @@ static void SDL_JNI_ThreadDestroyed(void* value)
 
 static void make_thread_key()
 {
+    //不论哪个线程调用了 pthread_key_create()，所创建的 key 都是所有线程可以访问的，
+    // 但各个线程可以根据自己的需要往 key 中填入不同的值，
+    // 相当于提供了一个同名而不同值的全局变量(这个全局变量相对于拥有这个变量的线程来说)。
     pthread_key_create(&g_thread_key, SDL_JNI_ThreadDestroyed);
 }
 
@@ -62,7 +65,8 @@ jint SDL_JNI_SetupThreadEnv(JNIEnv **p_env)
         ALOGE("SDL_JNI_GetJvm: AttachCurrentThread: NULL jvm");
         return -1;
     }
-
+    //函数在本进程执行序列中仅执行一次g_key_once = PTHREAD_ONCE_INIT
+    //即make_thread_key只走一遍
     pthread_once(&g_key_once, make_thread_key);
 
     JNIEnv *env = (JNIEnv*) pthread_getspecific(g_thread_key);
@@ -70,8 +74,11 @@ jint SDL_JNI_SetupThreadEnv(JNIEnv **p_env)
         *p_env = env;
         return 0;
     }
-
+    //当在一个线程里面调用AttachCurrentThread后，如果不需要用的时候一定要DetachCurrentThread，否则线程无法正常退出
+    //在C++创建的子线程中获取JNIEnv，要通过调用JavaVM的AttachCurrentThread函数获得
     if ((*jvm)->AttachCurrentThread(jvm, &env, NULL) == JNI_OK) {
+        //提供了在同一个线程中不同函数间共享数据即线程存储的一种方法
+        //使用pthread_getspecific获取env
         pthread_setspecific(g_thread_key, env);
         *p_env = env;
         return 0;
@@ -93,6 +100,7 @@ void SDL_JNI_DetachThreadEnv()
         return;
     pthread_setspecific(g_thread_key, NULL);
 
+    //从一个Java（Dalvik）虚拟机，分类当前线程。
     if ((*jvm)->DetachCurrentThread(jvm) == JNI_OK)
         return;
 
@@ -101,12 +109,16 @@ void SDL_JNI_DetachThreadEnv()
 
 int SDL_JNI_ThrowException(JNIEnv* env, const char* className, const char* msg)
 {
+    //检查上次操作有没有出现异常
     if ((*env)->ExceptionCheck(env)) {
+        //获得发生的异常
         jthrowable exception = (*env)->ExceptionOccurred(env);
+        //清除异常
         (*env)->ExceptionClear(env);
 
         if (exception != NULL) {
             ALOGW("Discarding pending exception (%s) to throw", className);
+            //删除局部引用，应该可以不需要删除？global的需要执行手动delete
             (*env)->DeleteLocalRef(env, exception);
         }
     }
@@ -117,7 +129,7 @@ int SDL_JNI_ThrowException(JNIEnv* env, const char* className, const char* msg)
         /* ClassNotFoundException now pending */
         goto fail;
     }
-
+    //抛出java层异常
     if ((*env)->ThrowNew(env, exceptionClass, msg) != JNI_OK) {
         ALOGE("Failed throwing '%s' '%s'", className, msg);
         /* an exception, most likely OOM, will now be pending */
