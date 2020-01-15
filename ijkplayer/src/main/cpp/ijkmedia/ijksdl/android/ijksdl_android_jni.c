@@ -100,7 +100,7 @@ void SDL_JNI_DetachThreadEnv()
         return;
     pthread_setspecific(g_thread_key, NULL);
 
-    //从一个Java（Dalvik）虚拟机，分类当前线程。
+    //从一个Java（Dalvik）虚拟机，分离当前线程。
     if ((*jvm)->DetachCurrentThread(jvm) == JNI_OK)
         return;
 
