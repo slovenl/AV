@@ -232,7 +232,8 @@ inline static void msg_queue_start(MessageQueue *q)
 }
 
 /* return < 0 if aborted, 0 if no msg and > 0 if msg.  */
-inline static int msg_queue_get(MessageQueue *q, AVMessage *msg, int block)
+/*小于0属于结束退出*/
+inline static int msg_queue_get(MessageQueue *q, AVMessage *msg, int block/*含义：是否立即执行进入下次循环*/)
 {
     AVMessage *msg1;
     int ret;
@@ -241,6 +242,7 @@ inline static int msg_queue_get(MessageQueue *q, AVMessage *msg, int block)
 
     for (;;) {
         if (q->abort_request) {
+            //结束，退出循环
             ret = -1;
             break;
         }
@@ -261,11 +263,11 @@ inline static int msg_queue_get(MessageQueue *q, AVMessage *msg, int block)
 #endif
             ret = 1;
             break;
-        } else if (!block) {
+        } else if (!block) {/*貌似block只有1的调用，所以此处走不进来，发送信号方法msg_queue_put_private*/
             ret = 0;
             break;
         } else {
-            SDL_CondWait(q->cond, q->mutex);
+            SDL_CondWait(q->cond, q->mutex);//如果没有消息，则等待消息put进来，进入下次循环
         }
     }
     SDL_UnlockMutex(q->mutex);

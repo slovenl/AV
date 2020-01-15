@@ -108,6 +108,8 @@ void ijkmp_io_stat_complete_register(void (*cb)(const char *url,
     ffp_io_stat_complete_register(cb);
 }
 
+
+/*更新播放器状态统一方法*/
 void ijkmp_change_state_l(IjkMediaPlayer *mp, int new_state)
 {
     mp->mp_state = new_state;
@@ -410,6 +412,8 @@ static int ijkmp_prepare_async_l(IjkMediaPlayer *mp)
 
     // released in msg_loop
     ijkmp_inc_ref(mp);
+
+    //开启消息线程，从队列中不断取出消息，通知到java层
     mp->msg_thread = SDL_CreateThreadEx(&mp->_msg_thread, ijkmp_msg_loop, mp, "ff_msg_loop");
     // msg_thread is detached inside msg_loop
     // TODO: 9 release weak_thiz if pthread_create() failed;
