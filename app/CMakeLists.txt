@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # Gradle automatically packages shared libraries with your APK.
 add_compile_options(-w)  #不显示编译警告
 include_directories("src/main/jni/3rdparty/ffmpeg/include")
-include_directories("src/main/jni/audio_effect/libaudio_effect/audio_effect_filter_impl/pitch_shift/include")
+include_directories("src/main/jni")
 
 file(GLOB camera_preview "src/main/jni/camera_preview/*.cpp")
 
@@ -253,38 +253,39 @@ add_library( # Sets the name of the library.
 # build script, prebuilt third-party libraries, or system libraries.
 set(PATH_TO_PRE_BUILT src/main/jni/3rdparty/prebuilt/${ANDROID_ABI})
 
-add_library(libavutil STATIC IMPORTED)
-set_target_properties(libavutil PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavutil.a)
-
-add_library(libavfilter STATIC IMPORTED)
-set_target_properties(libavfilter PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavfilter.a)
-
-add_library(libavformat STATIC IMPORTED)
-set_target_properties(libavformat PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavformat.a)
-
-add_library(libavcodec STATIC IMPORTED)
-set_target_properties(libavcodec PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavcodec.a)
-
-add_library(libpostproc STATIC IMPORTED)
-set_target_properties(libpostproc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libpostproc.a)
-
-add_library(libswresample STATIC IMPORTED)
-set_target_properties(libswresample PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswresample.a)
-
-add_library(libswscale STATIC IMPORTED)
-set_target_properties(libswscale PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswscale.a)
-
-add_library(libfdk-aac STATIC IMPORTED)
-set_target_properties(libfdk-aac PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libfdk-aac.a)
-
-add_library(libvo-aacenc STATIC IMPORTED)
-set_target_properties(libvo-aacenc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libvo-aacenc.a)
-
-add_library(libx264 STATIC IMPORTED)
-set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libx264.a)
-
-add_library(libsox STATIC IMPORTED)
-set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libsox.a)
+#
+#add_library(libavutil STATIC IMPORTED)
+#set_target_properties(libavutil PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavutil.a)
+#
+#add_library(libavfilter STATIC IMPORTED)
+#set_target_properties(libavfilter PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavfilter.a)
+#
+#add_library(libavformat STATIC IMPORTED)
+#set_target_properties(libavformat PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavformat.a)
+#
+#add_library(libavcodec STATIC IMPORTED)
+#set_target_properties(libavcodec PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libavcodec.a)
+#
+#add_library(libpostproc STATIC IMPORTED)
+#set_target_properties(libpostproc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libpostproc.a)
+#
+#add_library(libswresample STATIC IMPORTED)
+#set_target_properties(libswresample PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswresample.a)
+#
+#add_library(libswscale STATIC IMPORTED)
+#set_target_properties(libswscale PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libswscale.a)
+#
+#add_library(libfdk-aac STATIC IMPORTED)
+#set_target_properties(libfdk-aac PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libfdk-aac.a)
+#
+#add_library(libvo-aacenc STATIC IMPORTED)
+#set_target_properties(libvo-aacenc PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libvo-aacenc.a)
+#
+#add_library(libx264 STATIC IMPORTED)
+#set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libx264.a)
+#
+#add_library(libsox STATIC IMPORTED)
+#set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libsox.a)
 
 #add_library(libsox STATIC IMPORTED)
 #set_target_properties(libx264 PROPERTIES IMPORTED_LOCATION ${PATH_TO_PRE_BUILT}/libsox.a)
@@ -301,14 +302,14 @@ target_link_libraries( # Specifies the target library.
         OpenSLES
         GLESv2
         # 引入ffmpeg相关静态库
-        libavutil
-        libavfilter
-        libavformat
-        libavcodec
-        libpostproc
-        libswresample
-        libswscale
-        libfdk-aac
-        libvo-aacenc
-        libx264
+        ${PATH_TO_PRE_BUILT}/libavutil.a
+        ${PATH_TO_PRE_BUILT}/libavfilter.a
+        ${PATH_TO_PRE_BUILT}/libavformat.a
+        ${PATH_TO_PRE_BUILT}/libavcodec.a
+        ${PATH_TO_PRE_BUILT}/libpostproc.a
+        ${PATH_TO_PRE_BUILT}/libswresample.a
+        ${PATH_TO_PRE_BUILT}/libswscale.a
+        ${PATH_TO_PRE_BUILT}/libfdk-aac.a
+        ${PATH_TO_PRE_BUILT}/libvo-aacenc.a
+        ${PATH_TO_PRE_BUILT}/libx264.a
         )

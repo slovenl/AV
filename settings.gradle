@@ -1,13 +1,14 @@
-include ':ZXKVideoPlayer'
+//include ':ZXKVideoPlayer'
 //include ':encryption'
 //include ':wangyiplayer'
-include ':udemyplayer'   //
+//include ':udemyplayer'   //
 //include ':WangYiPlayer'   //网易ndk-player
 //include ':WangYiPush'   //网易ndk推流demo
 //include ':test'
 //include ':app'
+include ':splayer'
 //include ':openGLRender'
 //include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
-include ':ijkplayer'
+//include ':ijkplayer'
 //include ':webrtc_ns'  //webrtc噪声抑制模块
 rootProject.name = 'AV'
