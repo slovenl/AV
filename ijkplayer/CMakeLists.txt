@@ -158,7 +158,7 @@ set(common_sources
         )
 
 set(armeabi_v7a_sources
-        src/main/cpp/ijkmedia/ijkyuv/source/compare_neon.cc
+        src/main/cpp/ijkmedia/ijkyuv/source/compare_neon.cc  # .cc与.cpp是一样的，没有啥区别
         src/main/cpp/ijkmedia/ijkyuv/source/rotate_neon.cc
         src/main/cpp/ijkmedia/ijkyuv/source/row_neon.cc
         src/main/cpp/ijkmedia/ijkyuv/source/scale_neon.cc
