@@ -39,4 +39,8 @@ public class SPlayer implements IPlayer{
     private native void native_seek(long pos);
     private native void native_stop();
     private native void native_release();
+
+    static{
+        System.loadLibrary("player_jni");
+    }
 }
