@@ -10,10 +10,10 @@ find_library(
         log)
 
 find_library(
-        android
+        android-lib
         android)
 
 target_link_libraries(
         player_jni
-        ${android}
+        ${android-lib}
         ${log-lib})
