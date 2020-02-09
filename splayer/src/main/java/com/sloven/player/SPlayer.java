@@ -5,40 +5,40 @@ public class SPlayer implements IPlayer{
 
     @Override
     public void setDataSource(SDataSource data) {
-        native_setDataSource(data);
+        _setDataSource(data);
     }
 
     @Override
     public void start() {
-        native_start();
+        _start();
     }
 
     @Override
     public void pause() {
-        native_pause();
+        _pause();
     }
 
     @Override
     public void seek(long pos) {
-        native_seek(pos);
+        _seek(pos);
     }
 
     @Override
     public void stop() {
-        native_stop();
+        _stop();
     }
 
     @Override
     public void release() {
-        native_release();
+        _release();
     }
 
-    private native void native_setDataSource(SDataSource data);
-    private native void native_start();
-    private native void native_pause();
-    private native void native_seek(long pos);
-    private native void native_stop();
-    private native void native_release();
+    private native void _setDataSource(SDataSource data);
+    private native void _start();
+    private native void _pause();
+    private native void _seek(long pos);
+    private native void _stop();
+    private native void _release();
 
     static{
         System.loadLibrary("player_jni");
