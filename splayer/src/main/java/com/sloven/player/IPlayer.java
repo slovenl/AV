@@ -4,6 +4,8 @@ public interface IPlayer {
 
     void setDataSource(SDataSource data);
 
+    void prepare();
+
     void start();
 
     void pause();

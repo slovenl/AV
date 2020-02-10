@@ -9,6 +9,11 @@ public class SPlayer implements IPlayer{
     }
 
     @Override
+    public void prepare() {
+        _prepare();
+    }
+
+    @Override
     public void start() {
         _start();
     }
@@ -34,6 +39,7 @@ public class SPlayer implements IPlayer{
     }
 
     private native void _setDataSource(SDataSource data);
+    private native void _prepare();
     private native void _start();
     private native void _pause();
     private native void _seek(long pos);

@@ -9,6 +9,10 @@
 #define LOG_TAG "SLOVEN"
 #define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
+static void SPlayer_prepare(JNIEnv* env, jobject thiz){
+    LOGD("SPlayer_start");
+}
+
 static void SPlayer_start(JNIEnv* env, jobject thiz){
     LOGD("SPlayer_start");
 }
@@ -27,6 +31,7 @@ static void SPlayer_pause(JNIEnv* env, jobject thiz){
 
 static JNINativeMethod g_methods[] = {
         { "_start",                 "()V",      (void *) SPlayer_start },
+        { "_prepare",                 "()V",      (void *) SPlayer_prepare },
         { "_stop",                  "()V",      (void *) SPlayer_stop },
         { "seekTo",                 "(J)V",     (void *) SPlayer_seekTo },
         { "_pause",                 "()V",      (void *) SPlayer_pause }
