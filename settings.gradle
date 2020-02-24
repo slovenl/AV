@@ -7,8 +7,9 @@
 //include ':test'
 //include ':app'
 include ':splayer'
+include ':fdk_aac'
 //include ':openGLRender'
-include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
+//include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
 include ':ijkplayer'
 //include ':webrtc_ns'  //webrtc噪声抑制模块
 rootProject.name = 'AV'
