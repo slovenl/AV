@@ -17,6 +17,7 @@ void SPlayer::pause() {
 }
 
 void SPlayer::seek(long pos) {
+    
 }
 
 void SPlayer::stop() {
