@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.tencent.audiochanneldemo.AudioChannelDemoActivity"
+    >
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        >
+        <TextView
+            android:id="@+id/text_top_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            />
+        <Button
+            android:id="@+id/button_switch_audiooutput"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="播放声道类型：第三方，点击切换"
+            />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+
+            <Button
+                android:id="@+id/button_get_device_type"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="获取外设类型"
+                />
+
+            <TextView
+                android:id="@+id/text_device_type"
+                android:layout_marginLeft="5dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+
+            <TextView
+                android:id="@+id/text_ip"
+                android:layout_marginLeft="5dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/text_ports"
+                android:layout_marginLeft="5dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="当前播放时间："
+                />
+            <TextView
+                android:id="@+id/text_play_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+            <Button
+                android:id="@+id/button_play_karaoke"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="开始K歌（话筒）（播放伴奏+播放人声+回传人声数据）"
+                />
+
+            <Button
+                android:id="@+id/button_voice_search"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="开始语音搜索（话筒）（只回传人声数据）"
+                />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+            <Button
+                android:id="@+id/button_pause"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="暂停"
+                />
+            <Button
+                android:id="@+id/button_resume"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="继续"
+                />
+            <Button
+                android:id="@+id/button_stop"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="停止"
+                />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                />
+            <TextView
+                android:id="@+id/text_play_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+            <Button
+                android:id="@+id/button_media_vol_up"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="伴奏音量+"
+                />
+            <Button
+                android:id="@+id/button_media_vol_down"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="伴奏音量-"
+                />
+            <TextView
+                android:id="@+id/text_media_vol"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+            <Button
+                android:id="@+id/button_mic_vol_up"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mic音量+"
+                />
+            <Button
+                android:id="@+id/button_mic_vol_down"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mic音量-"
+                />
+            <TextView
+                android:id="@+id/text_mic_vol"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="人声文件信息："
+                />
+            <TextView
+                android:id="@+id/text_saved_mic_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+            <Button
+                android:id="@+id/button_play_save_mic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="播放最近一次人声"
+                />
+        </LinearLayout>
+
+
+    </LinearLayout>
+
+
+</ScrollView>

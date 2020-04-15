@@ -7,6 +7,7 @@
 //include ':test'
 //include ':app'
 include ':splayer'
+//include ':audio_channel_interface'  //全民k歌提供，底层音频组件
 include ':fdk_aac'
 //include ':openGLRender'
 //include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
