@@ -1,0 +1,1781 @@
+
+
+
+
+
+
+多媒体架构分析 
+
+
+Description Author 
+ wylhistory 
+   
+ 
+ ABSTRACT.........................................................................................................................................................4 
+ INTRODUCTION...............................................................................................................................................4 
+ ANDROID 多媒体架构.......................................................................................................................................4 
+ 代码位置.......................................................................................................................................................5 
+ M
+PLAYER...............................................................................................................................................6 
+ 
+层...............................................................................................................................................................6 
+ M
+PLAYER客户端...................................................................................................................................7 
+ B
+MEDIAPLAYER..........................................................................................................................................8 
+ PVP
+层................................................................................................................................................9 
+ P
+DRIVER............................................................................................................................................10 
+ 引擎层PVP
+ENGINE...........................................................................................................................11 
+ PVP
+DATAPATH层..............................................................................................................................13 
+ 节点层.........................................................................................................................................................14 
+ MIO层.........................................................................................................................................................16 
+ 控制逻辑小结.............................................................................................................................................18 
+ 例子分析.............................................................................................................................................................18 
+ N
+MEDIAPLAYER的流程.........................................................................................................................19 
+ 
+DATASOURCE逻辑.................................................................................................................................19 
+ 引擎层
+前的流程...........................................................................................................................21 
+ PVPlayer的处理逻辑..........................................................................................................................21 
+ Playerdriver的处理逻辑.....................................................................................................................22 
+ 引擎层的处理.....................................................................................................................................23 
+ Run_init的逻辑...................................................................................................................................28 
+ Audio输出和video输出的设置...........................................................................................................30 
+ 引擎层
+的处理...............................................................................................................................34 
+ PVP_ENGINE_STATE_INITIALIZED状态时的处理........................................................................34 
+ PVP_ENGINE_STATE_TRACK_SELECTION_1_DONE逻辑..........................................................38 
+ PVP_ENGINE_STATE_TRACK_SELECTION_2_DONE的逻辑......................................................38 
+ PVP_ENGINE_STATE_TRACK_SELECTION_3_DONE的处理......................................................39 
+ PVP
+DATAPATH层的PREPARE相关处理逻辑....................................................................................43 
+ 进入PREPARE_INIT状态以前的处理...............................................................................................45 
+ PREPARE_INIT状态的逻辑...............................................................................................................46 
+ PREPARE_REQPORT状态的逻辑.....................................................................................................47 
+ PREPARE_CONNECT状态的逻辑....................................................................................................50 
+ PREPARE_PREPARE的逻辑.............................................................................................................52 
+ P
+的收官之战...................................................................................................................................53 
+ S
+流程的分析.......................................................................................................................................56 
+ Android本身架构对start的处理.........................................................................................................56 
+?Tech, 2010-2-5 Page 2 of 73
+
+
+ PlayerDriver层的start流程.................................................................................................................57 
+ 引擎层的start处理..............................................................................................................................57 
+ 数据
+的流动................................................................................................................................................59 
+PV的架构，数据的传递分成两种模式，....................................................................................................59 
+ Component的初始化...........................................................................................................................59 
+ Tunnel模式的数据流动......................................................................................................................61 
+ 非tunnel模式的数据流动...................................................................................................................63 
+ MIO的数据处理..................................................................................................................................64 
+ 同步问题.............................................................................................................................................................66 
+ 关于COMPONENT的集成...............................................................................................................................67 
+ 接口库的加载时机.....................................................................................................................................67 
+ 动态库的加载.....................................................................................................................................68 
+ omx_interface的实现..........................................................................................................................69 
+ 注册表的填充.....................................................................................................................................71 
+ 集成总结.............................................................................................................................................................72 
+ 未分析.................................................................................................................................................................72 
+ REFERENCE....................................................................................................................................................72 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?Tech, 2010-2-5 Page 3 of 73
+
+
+
+
+
+android的多媒体架构，以及和集成相关的东西. 
+
+的多媒体架构及其的复杂，代码量也是非常的大，甚至我认为是所有模块里面
+ 
+ 
+
+多媒体架构 
+的多媒体架构简单划分可以分层两部分，opencore以及 opencore之上,如图： 
+图3.0.0 android多媒体架构 
+本身的架构又分成如下三个部分： 
+：application layer，这层，由android自己实现； 
+，这层，marvel自己实现了一套编解码component； 
+?Tech, 2010-2-5 Page 4 of 73
+
+
+
+ 
+
+
+  图3.0.1 openmax框架 
+
+ 
+层：也就是用户操作的界面，比如播放暂停等，主要是mediaplayer.java； 
+层：也就是连接java和c代码的地方,主要是android_media_mediaplayer.cpp； 
+客户端：也就通过binder转发jni的命令到服务器端的地方，主要在mediaplayer.cpp里面； 
+也就是接受客户端请求的地方，当然它依然只是一个管理的地方，不是真正干活的地方； 
+和openmax的适配层：这里是连接android框架和openmax引擎的地方； 
+引擎：这里是引擎层，负责管理各个component的地方，并控制状态切换； 
+层：这里就是各个component了； 
+层：这里就是提供一些基本的操作原语的地方； 
+
+下面分别介绍一下这几层，包括它们之间的交互，当然需要提一下相关的代码，最后以一个实际的
+ 
+代码位置 
+Android为例MediaPlayer的代码主要在以下的目录中： 
+程序的路径： 
+
+
+本地调用部分（JNI）： 
+
+libmedia_jni.so。 
+?Tech, 2010-2-5 Page 5 of 73
+
+
+
+ 
+
+libmedia.so库源文件的目录frameworks/base/media/libmedia/相对应的。主要的头文件
+  
+：定义了类class IMediaPlayerClient和类BnMediaPlayerClient，后者主要用来
+  
+：定义了类 class MediaPlayer，继承于BnMediaPlayerClient，供jni层使用； 
+：这个是接口类，定义了class IMediaPlayer: public IInterface和class BnMediaPlayer: 
+；  
+：定义了接口class IMediaPlayerService: public IInterface，和class 
+。 
+： 
+
+
+ 
+
+libmedia.so。 
+
+ 
+
+mediaplayerservice.h和mediaplayerservice.cpp 
+libmediaplayerservice.so。 
+
+OpenCore的多媒体播放器部分  
+
+libopencoreplayer.so。 
+
+从程序规模上来看，libopencoreplayer.so是主要的实现部分，而其他的库基本上都是在其上建立的
+ 
+
+
+
+UI程序使用的java类；它的存在就是为了完全独立底层
+ 
+
+
+
+
+JNI层，也就是说它真正做的事都是通过JNI来做的，这几句话做的事情后面会详
+ 
+层 
+ 
+
+   {"setDataSource",       "(Ljava/lang/String;)V",            (void 
+android_media_MediaPlayer_setDataSource}, 
+
+
+
+?Tech, 2010-2-5 Page 6 of 73
+
+
+  {"prepare",             "()V",                              (void *)android_media_MediaPlayer_prepare}, 
+
+   {"_start",              "()V",                              (void *)android_media_MediaPlayer_start}, 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+可以看见，这里面有对先前调用的setDataSource,prepare,start的本地实现，比如： 
+
+
+
+mp = getMediaPlayer(env, thiz); 
+
+
+
+
+ setVideoSurface(mp, env, thiz); 
+process_media_player_call( env, thiz, mp->prepare(), "java/io/IOException", "Prepare failed." ); 
+
+
+new的时候建立的MediaPlayer，然后
+，然后开始调用mp->prepare，prepare里面做的工作是最多的，非常的繁琐，后
+prepare以后，就可以通过start来启动了； 
+客户端 
+binder的机制，这个就很好理解了，这个就是MediaplayerService在客户端的代理了，它的创
+ 
+
+
+?Tech, 2010-2-5 Page 7 of 73
+
+
+
+
+ sp<IServiceManager> sm = defaultServiceManager(); 
+
+
+sm->getService(String16("media.player")); 
+
+
+
+
+
+
+
+
+
+ sMediaPlayerService = interface_cast<IMediaPlayerService>(binder); 
+
+
+ return sMediaPlayerService; 
+
+servicemanager利用getService就可以返回一个BpMediaPlayerService,然后通过它的create函数也
+service->create(getpid(), this, url)就创建了一个BpMediaPlayer，这两个结构本质上就是
+和BnMediaPlayer的代理，通过它就可以访问后面这两个服务器端的方法了,
+ 
+
+mPlayer->prepareAsync() 
+BnMediaPlayer里面的prepareAsync了； 
+
+
+的实现如下（注意这里的Client原型为： 
+）： 
+
+
+
+
+
+ p->prepareAsync(); 
+
+
+
+
+
+
+prepareAsync还是通过一个p->prepareAsync来实现的，而p是来自于哪里呢？ 
+ 
+?Tech, 2010-2-5 Page 8 of 73
+
+
+
+p是在setDataSource的时候，通过new创建出来的一个PVPlayer实例； 
+PVPlayer层了，继续往下看： 
+
+
+层 
+prepareAsync 
+
+
+
+
+
+
+
+
+mPlayerDriver->enqueueCommand(new 
+(mDataSourcePath,run_init,this)); 
+mIsDataSourceSet = true; 
+
+
+
+  ret = mPlayerDriver->enqueueCommand(new PlayerPrepare(do_nothing, NULL)); 
+} 
+
+
+
+
+?Tech, 2010-2-5 Page 9 of 73
+
+
+PVPlayer::prepareAsync基本上没干啥有用的，只是把一条命令加入到了一个队列，设置标志位，
+async的原因了； 
+，前面的所有的逻辑基本上都是二传手，下面着重分析的是PVPlayer以及下面几层； 
+
+
+加这层基本上可以看做是android的多媒体架构和opencore之间的桥梁； 
+
+ 
+ 
+ PVPlayer也就是上面已经提到过的，Android 媒体播放器的代言人； 
+ 而PVPlayerInterface则是opencore的引擎层的代理人； 
+ 红色的两个成员是和我们将要讨论的视频的输出有关的，后面会讲到； 
+ 至于其它的它的父类，为了不打断我们的思路，就留到后面讲，简单的说：
+的作用就是给引擎层访问的PlayerDriver提供接口，用来处理引
+OsclActiveObject简单说就是一个执行上下文，它类似一个Timer，
+Run函数，如果没人触发它将一直不执行，比如PVPlayer发送到队列里面的
+Run函数里面处理的；而PVCommandStatusObserver也和
+类似，是由引擎层来调用的接口，以方便PlayerDriver传递的命
+PVErrorEventObserver类似； 
+
+的逻辑架构很简单，就是将PVPlayer的命令放入队列，然后在run函数里面一个个取出
+”handle”开头的函数都是实际的处理函数，而不带handle的都是加入到队列的函数，
+handle的函数的处理一般都是这样的，比如先前的prepareAsync命令的处理函数： 
+
+
+
+
+
+
+
+
+
+
+
+
+ mPlayerCapConfig->setParametersSync(NULL, &iKVPSetAsync, 1, 
+
+mPlayer->Prepare(command)); 
+
+
+
+?Tech, 2010-2-5 Page 10 of 73
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+mPlayerCapConfig->setParametersSync 和mPlayer->Prepare来完成
+opencore这个mPlayerCapConfig和mPlayer是同一个指针； 
+引擎层PVPlayerEngine 
+比如prepare等，最后都落在了PVPlayerEngine这里了，这里是opencore的核心，
+逻辑处理有点像PlayerDriver，也是先把命令放到队列里面，然后在run函数里面
+一万七千行！！！还是先看看它的组成结
+ 
+ PVPlayerEngine 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+?Tech, 2010-2-5 Page 11 of 73
+
+
+
+ 
+
+它的特点就是凡是以”Do”开始的就是实际的处理命令的地方，而不带Do
+ 
+
+
+
+
+AddCommandToQueue(PVP_ENGINE_COMMAND_PREPARE, 
+
+
+Do”的就只是通过AddCommandToQueue加入到队列，而 
+
+?Tech, 2010-2-5 Page 12 of 73
+
+
+
+
+
+ 
+Oscl_Vector<PVPlayerEngineCommand, OsclMemAllocator> iCurrentCmd;是描述当前正在处理
+OsclPriorityQueue<PVPlayerEngineCommand, OsclMemAllocator, 
+
+; // Vector to hold the command that has been requested是描述放入到队列里面的命令，
+run函数，在那里会根据状态以及命令的类型一个个取出来然后处理； 
+ 
+也就是正常情况下从IDLE——>INITIALIZED——>PREPARED——>STARTED，当
+prepared，里面又细分为好几个状态，后面会讲到； 
+层 
+ 
+PVPlayerDatapath，而另外一部分就是调用这个
+来处理相关的命令，比如prepare，start，pause等；也来看看它的结构： 
+
+PVMFNodeInterface,它其实就是存放的实际的node，比如iSourceNode，
+?Tech, 2010-2-5 Page 13 of 73
+
+
+，iSinkNode，而PVMFPortInterface就是存放的这些Node所拥有的这些Port，而这些port
+ 
+
+
+
+
+ 
+
+ISourceOutPort就有可能是来自于一个文件构成的node，中间两个port是由一个解码器的node来提
+sink port它就有可能是视频输出的地方了； 
+节点层 
+ PVMediaOutputNode，因为我们比较关注的是它和MIO的集成，先看看它的组成： 
+
+playerdriver一样，都是有一个自己的run函数里面处理datapath层
+PVPlayerDatapath）传下来的命令，比如： 
+PVMediaOutputNode::Prepare(PVMFSessionId s, const 
+
+
+
+
+
+:Construct(s, PVMF_GENERIC_NODE_PREPARE, aContext); 
+QueueCommandL(cmd); 
+
+”Do”开头的函数里面，比如： 
+PVMediaOutputNode::DoPrepare(PVMediaOutputNodeCmd& aCmd) 
+
+
+
+
+
+
+
+SendMioRequest(aCmd, EInit); 
+
+
+SendMioRequest由iMIOControl来完成具体的工作： 
+
+
+
+?Tech, 2010-2-5 Page 14 of 73
+
+
+
+
+ { 
+
+
+
+ iInPortVector[0]->getMediaTransfer(); 
+
+
+
+iMIOControl->Init();); 
+
+
+
+
+
+
+
+
+
+
+
+
+iMIOControl的init来完成具体的准备工作； 
+ 
+?Tech, 2010-2-5 Page 15 of 73
+
+
+“Framework Component”也就是我说的Node了，而下面的那些”Source Component”
+component了，而对于所谓的tunnel模式，Non-tunnel模式也留到后面
+ 
+
+层 
+marvel的处理逻辑，最后的数据输出都是经过MIO出来的，所以需要看看它的结构： 
+
+默认实现了PvmiMIOControl,PvmiMediaTransfer和PvmiCapabilityAndConfig以及
+接口，这样就可以在一个类里面做配置传输等工作了；其中的iPeer也就是和它传
+而mSurface也就是代表物理的层，当然，对于marvel的实现，这个成员仅仅是用来判
+fb2来发送的，后面会讲； 
+ 
+?Tech, 2010-2-5 Page 16 of 73
+
+
+
+ 
+
+?Tech, 2010-2-5 Page 17 of 73
+
+
+控制逻辑小结 
+ 
+
+
+Node层，对于不同的目的的Node处理不一样，比如上面已经讨论的output 的node它就需
+MIO做初始化等，而对于decode的node，就需要对里面所拥有的decode的component进行初始化
+ 
+
+例子分析 
+ 
+
+
+
+
+ 
+?Tech, 2010-2-5 Page 18 of 73
+
+
+MediaPlayer的流程 
+ 
+
+MediaPlayer,并设置了监听者，用于通知上层关于mp的事件； 
+MediaPlayerService端建立连接，也就是说这时候仅仅是MediaPlayer还不是
+
+
+逻辑 
+ 
+） 客户端的mPlayer的创建； 
+） 对于服务器端的mPlayer （=new PVPlayer（））的创建; 
+） mAudioOutput = new AudioOutput(); 这个用于audio输出，不过我不打算讨论这块。 
+） mDataSourcePath = strdup(url);这里保存源地址； 
+ 
+?Tech, 2010-2-5 Page 19 of 73
+
+
+
+
+
+?Tech, 2010-2-5 Page 20 of 73
+
+
+ 
+） 创建PVPlayer,它的作用前面已经说了，是连接Android的多媒体架构和pv架构的桥梁； 
+） 创建音频输出层，将来音频输出将从这里出来； 
+） 保存源地址，供prepare的时候真正使用； 
+） 更新状态为INITIALIZED; 
+
+引擎层prepare前的流程 
+prepare的准备工作都是在这里做的，需要分成 
+） PVPlayer及以上； 
+） PlayerDriver的处理； 
+） PVPlayerEngine的处理； 
+） PVPlayerDatapath的处理； 
+ 
+的处理逻辑 
+PVPlayer的： 
+
+prepare到了这里就变成了prepareAsync了，前面有提到过，这里就是把命令加入到队列，然后从run
+ 
+） 构造并加入PLAYER_SET_DATA_SOURCE命令到队列里面； 
+） 设置回调函数； 
+ 
+?Tech, 2010-2-5 Page 21 of 73
+
+
+
+
+ if (!mIsDataSourceSet) mPlayerDriver->enqueueCommand(new PlayerSetDataSource(mDataSourcePath,,this));run_init命令执行完后调用PlayerSetDataSourc
+
+PL
+
+, cbf, 
+FirstSecondmPlayerDriver->enqueueCommand
+
+的处理逻辑 
+setDataSource命令在这里会真正实现，而run_init的执行要等到命令执行完毕才会被执行，
+PLAYER_SET_DATA_SOURCE命令的处理： 
+
+PlayerDriver的处理逻辑就是先从队列里面取出命令，然后根据命令类型，比如这次是
+?Tech, 2010-2-5 Page 22 of 73
+
+
+就调用handleSetDataSource来处理，在这里再根据source的类型初始化一下
+source的格式等，最后调用引擎层的AddDataSource来处理; 
+引擎层的处理 
+ 
+
+
+
+PVP_ENGIN
+
+
+, 
+
+
+
+
+AddCommandToQueue里面会调用RunIfNotReady函数，这个函数的调用逻辑很复杂，不过你可以简单的
+active object的run函数，于是我们看看引擎层的run函数如何处理这个命令，看看它的
+ 
+ Engine AO will execute commands in the following sequence: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+reset，或者取消等命令，再次考虑是不是在Prepare状态，
+DoPrepare，这在后面我们会看到对于prepare的复杂的处理！！！然后考虑是不是正处
+iPendingCmds里面的命令，现在对
+iPendingCmds里面去处理了，先取出命令判断类型，如果是
+类型就调用DoAddDataSource来做实际的事情，它的调
+ 
+?Tech, 2010-2-5 Page 23 of 73
+
+
+
+DoAddDataSource，分成格式是否被识别，做不同的处理，比如对于一个普通的视频，这时候它的格式
+ 
+
+ 
+（…） 
+ 
+来通知上层，比如对于引擎层， 
+RecognizeCompleted函数将会被调用，调用逻辑如下： 
+
+URL格式，然后调用DoSetupSourceNode来处理， 
+ 
+， 根据源文件格式查找出对应的UUID； 
+， 根据UUID创建source node； 
+， 连接source node； 
+， 查询PVP_CMD_SourceNodeQueryInitIF接口； 
+ 
+?Tech, 2010-2-5 Page 24 of 73
+
+
+
+Node对于ThreadLogon和connect的实现都不一样，有的node基本上什么事都没干，这两个函数
+就有点像session,也就是说如果事情需要在一个会话里面初始化的，那么就需要把事情在那里
+session的空间的分配等（主要目的是为了多线程的并发处理）； 
+PVP_CMD_SourceNodeQueryInitIF接口后会触发
+的执行，它的逻辑如下： 
+?Tech, 2010-2-5 Page 25 of 73
+
+
+
+如果成功的话，iSourceNodePVInterfaceTrackSel会被初始化，这个变量非常重要，因为它负责文件的
+track的建立，详细信息，后面会讲； 
+，我们现在假定我们这些事都已经成功的完成了，那么先前设好的run_init函数将会被执行了，也
+OK，好吧，我们来看看： 
+?Tech, 2010-2-5 Page 26 of 73
+
+
+
+node执行完一个命令后，将会触发它的CommandComplete函数，在那里，它会调用node的观
+NodeCommandCompleted，在这里，我们的观察者就是PVPlaerEngine，于是它的
+函数将会被执行，它当然还得回到PlayerDriver层才行，它的逻辑如下： 
+?Tech, 2010-2-5 Page 27 of 73
+
+
+
+
+
+
+
+
+
+
+
+
+EngineCommandCompletedNodeCommandCompletedPVPlayerEngineconstructpvplayer
+
+command的complete函数终于得以执行，也就是run_init函数被执行了，现在
+ 
+的逻辑 
+ 
+
+
+
+
+
+  p->mPlayerDriver->enqueueCommand(new PlayerInit(run_set_video_surface, cookie)); 
+
+
+
+(PLAYER_INIT, cbf, cookie) {} 
+
+和其它命令的处理逻辑一样，就是加入到PlayerDriver的命令队列里面，等待被处理； 
+run_init本身的执行逻辑一样，这里的run_set_video_surface，也就是命令本身设置的回调函数，它的调
+PLAYER_INIT的命令，playerdriver是怎
+ 
+
+?Tech, 2010-2-5 Page 28 of 73
+
+
+
+
+setDataSource逻辑一样，最后这些命令的处理都得到引擎层去实现，对于init命令，最后会调用到
+的init命令来处理（后面会讲到decode以及sinknode的初始化）；这个命令处理后会先触发引擎
+ 
+?Tech, 2010-2-5 Page 29 of 73
+
+
+
+PVP_ENGINE_STATE_INITIALIZED！！！ 
+playerdriver层的命令回调函数run_set_video_surface将会
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+  mp->setVideoSurface(native_surface); 
+
+mp->prepareAsync(), "java/io/IOException", "Prepare Async failed." ); 
+
+
+JNI层调用prepareAsync的时候会先设置surface，对于PVPlayer,这个逻辑很简单，只是保存一下： 
+
+
+
+ mSurface = surface; 
+
+
+，现在可以看看mp->setVideoSurface(native_surface)了： 
+输出和video输出的设置 
+ 
+?Tech, 2010-2-5 Page 30 of 73
+
+
+
+
+
+
+
+
+, cookie)); if (p->mSurface == NULL)Yesp->mPlayerDriver->enqueueCommand(new PlayerSetVideoSurface(p->mSurface, run_set_audio_output, cookie));NO
+P
+
+)run_set_audio_out
+run_set_video_surface
+
+
+对于命令的加入和取出以及回调函数的逻辑，前面已经说过，以后我都直接讨论函数本身了，这里
+ 
+） PLAYER_SET_VIDEO_SURFACE的命令的处理； 
+） 对于上面的命令执行完毕后的回调函数run_set_audio_output，即PLAYER_SET_AUDIO_SINK命令的处
+; 
+） 对于PLAYER_SET_AUDIO_SINK命令处理完毕后的回调函数run_prepare; 
+
+处理 
+ 
+?Tech, 2010-2-5 Page 31 of 73
+
+
+） 先尝试通过动态库加载的形式来创建MIO，我看omap的芯片很多是通过这种方式来实现MIO的； 
+ 如果没有实现硬件特定的MIO，就创建一个Android框架提供的通用的MIO； 
+ 为MIO设置输出surface，以及传递一个PVPlayer，用于接收MIO传递上来的事件（目前未看见
+的相关实现）； 
+ mVideoOutputMIO = mio;保存此MIO； 
+ 创建mVideoNode，这个是用来和MIO交互的component； 
+ 创建mVideoSink并设置sink node，即SetDataSinkNode(mVideoNode); 
+ 设置视频输出格式为PVMF_MIME_YUV420； 
+ mPlayer->AddDataSink(*mVideoSink, command)，让引擎层添加data sink； 
+
+marvel用的是通用的MIO，也就是AndroidSurfaceOutput,然后在通过set把fb2的
+设置进去（我的猜想），在输出component也就是mVideoNode里面利用这个fb2把数据写出去，
+omap是通过一个扩展的库libopencorehw.so来扩展实现的； 
+mVideoNode和mVideoSink有点混淆，其实可以这么理解，mVideoSink是OPENCORE层
+node，而mVideoNode是所谓的component，它是和解码器一个层次的，node在更上面一层； 
+AddDataSink： 
+DoAddDataSink处理，简略示意如下： 
+
+
+
+; 
+
+
+ iDatapathList.push_back(newdatapath); 
+
+
+
+简单的说就是加入到引擎所拥有的datapathlist里面，然后调用回调函数； 
+的处理逻辑 
+PLAYER_SET_VIDEO_SURFACE处理完后，对应的command的回调函数将会被触发了，代码如
+?Tech, 2010-2-5 Page 32 of 73
+
+
+ 
+
+
+
+
+
+enqueueCommand(new PlayerSetAudioSink(p->mAudioSink, run_prepare, 
+
+
+
+PLAYER_SET_AUDIO_SINK, cbf, cookie), mAudioSink(audioSink) {} 
+surface的逻辑基本差不多，如下： 
+
+
+
+
+
+
+
+
+mAudioOutputMIO = new AndroidAudioStream(); 
+
+setAudioSink(command->audioSink()); 
+
+ PVMediaOutputNodeFactory::CreateMediaOutputNode(mAudioOutputMIO); 
+
+
+SetDataSinkNode(mAudioNode); 
+
+PVMF_MIME_PCM16); 
+
+AddDataSink(*mAudioSink, command)); 
+
+
+audioSink的来源，那就要追溯到mediaplayerservice::Clinet里面的setDataSource了, 
+ 
+createPlayer(playerType); 
+
+
+  mAudioOutput = new AudioOutput(); 
+setAudioSink(mAudioOutput); 
+
+P就是返回给客户端的那个player，所以audiosink来自于此，其它的逻辑和视频差不多，也是创
+MIO，并且调用mPlayer的AddDataSink加入到datapathlist里面去了； 
+的处理 
+的处理终于开始了，它本身只是加入到队列里面去，然后调用handlePrepare，在里面基本
+ 
+来处理； 
+mPlayer就是我们所说的引擎层的player了； 
+
+?Tech, 2010-2-5 Page 33 of 73
+
+
+引擎层prepare的处理 
+run_prepare最后都是通过mPlayer->Prepare来实现的，下面开始看看它的入口逻辑： 
+
+
+DoPrepare之前，需要先说明一下， 
+prepare的处理分成四个阶段，如下： 
+） 引擎处于PVP_ENGINE_STATE_INITIALIZED，这是第一次进入DoPrepare的情况； 
+） 引擎处于PVP_ENGINE_STATE_TRACK_SELECTION_1_DONE； 
+） 引擎处于PVP_ENGINE_STATE_TRACK_SELECTION_2_DONE； 
+） 引擎处于PVP_ENGINE_STATE_TRACK_SELECTION_3_DONE； 
+ 
+
+状态时的处理 
+
+?Tech, 2010-2-5 Page 34 of 73
+
+
+引擎层处理 
+先看看这个逻辑图： 
+
+ 
+， 根据iSourceNodeTrackSelIF接口对象取得源文件的track信息（后面会讲）； 
+， sinknode->threadLogon;sinknode->Connect;就是做一些与线程相关的初始化； 
+， 查询这个sink node的配置接口； 
+， 查询这个sink node的同步控制接口； 
+IssueQueryInterface的方式来发送给节点层，然后当命令返回后在引擎层的
+函数里面会根据当前的状态（PVP_ENGINE_STATE_PREPARING）
+ 
+
+
+
+
+HandleSinkNodeQueryInterfaceMandatory里面会保存这个配置接口和同步接口，相
+ 
+
+
+
+  if (uuid == PvmfNodesSyncControlUuid) 
+
+
+ this); 
+
+
+
+
+
+?Tech, 2010-2-5 Page 35 of 73
+
+
+ 
+this); 
+
+
+
+
+
+
+
+
+
+
+
+PVMediaOutputNode本身（this）； 
+HandleSinkNodeQueryInterfaceMandatory先保存： 
+
+
+
+DoSinkNodeInit来对SinkNode进行初始化； 
+——>IssueSinkNodeInit——>aDatapath->iSinkNode->Init 
+SinkNode的初始化了（这里已经看到了sink的初始化），下面来看看node本身的
+; 
+层及以下的处理 
+ 
+
+
+
+
+
+
+
+  cmd.PVMediaOutputNodeCmdBase::Construct(s, PVMF_GENERIC_NODE_INIT, 
+
+
+
+Node层的处理几乎和它的父亲或者祖父如出一辙，就是一个命令队列，
+run里面调用ProcessCommand来处理，另外调用
+来通知上层，命令已经执行完毕，如下： 
+
+
+
+
+
+ ProcessCommand(); 
+
+
+
+
+
+
+
+
+?Tech, 2010-2-5 Page 36 of 73
+
+
+  CommandComplete(iCurrentCommand, iCurrentCommand.front(), PVMFSuccess); 
+
+
+init命令来说，处理逻辑如下： 
+
+
+
+——> SendMioRequest(aCmd, EQueryClockExtension); 
+EInit,而是EQueryClockExtension, 
+MIO是否支持PvmiClockExtensionInterfaceUuid的扩展，而对于
+的查询来说： 
+
+
+
+
+
+
+
+
+
+ if (aUuid == PVMI_CAPABILITY_AND_CONFIG_PVUUID) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PVMI_CAPABILITY_AND_CONFIG_PVUUID都不支持 
+，到这里基本上Node层即MIO的处理就完毕了，现在要回到引擎层处理
+命令的回调函数了； 
+的处理 
+PVP_CMD_SinkNodeInit命令在Node层执行完毕后，node层的run函数里面会通过
+函数通知上层，最终，在PVPlayerEngine::NodeCommandCompleted函数里
+HandleSinkNodeInit，它的逻辑比较简单，就干了
+ 
+PVP_ENGINE_STATE_TRACK_SELECTION_1_DONE); 
+ 
+
+run来函数处理新的状态（状态机的轮回）； 
+
+
+?Tech, 2010-2-5 Page 37 of 73
+
+
+逻辑 
+ 
+
+
+
+SINK就能播放的track，我只讨论简单正常的情况，所以对于这种特例我
+需要解码器才能工作的track，简单说一下所谓track，我
+
+，所以需要分开控制，当然必须得有一种机制实现复杂的同步，这个会在后面讲； 
+DoDecNodeQueryCapConfigIF的逻辑，为了不涉及复杂的解码器的逻辑，所以我
+decode的内部逻辑来，对于后面分析数据的流动的时候，我们再去分析；目前
+ 
+track，我们都需要有一个pathlist，而对于每一个pathlist，
+decode component，所以呢，代码里面的处理逻辑就是遍历tracklist，为
+pathlist查找decoder，查找的方法为： 
+） 先根据源文件的格式取得uuid； 
+） 根据uuid创建decoder，并加入到pathlist里面； 
+） 对于新的decode调用其初始化函数； 
+） 初始化函数执行完毕后会在PVPlayerEngine::NodeCommandCompleted里面调用
+处理； 
+） 在这里面会调用SetEngineState(PVP_ENGINE_STATE_TRACK_SELECTION_2_DONE);
+ 
+的逻辑 
+ 
+?Tech, 2010-2-5 Page 38 of 73
+
+
+
+
+
+
+
+
+
+DoSourceNodeTrac
+
+
+selectedtracks.addTrackInfo(*(iDatapathList[i].iTrackI
+iSourceNodeTrackSelIF->SelectTracksIssueSinkNodeReset(&(iDatapathList[i]), (OsclAny*) context, cmdid);IssueDecNodeReset
+ 
+） 根据src的格式以及用户的喜好设置确定tracklist； 
+） aDatapath->iSinkNode->Reset调用sinkNode的Reset函数进行状态复位，同时也要对MIO进行
+复位； 
+） 对于decode进行reset复位； 
+ 等这两个命令执行完毕后，NodeCommandCompleted会被执行再调用 
+进行状态的更新： 
+
+DoPrepare进入prepare里面的最后一个状态； 
+的处理 
+ 
+?Tech, 2010-2-5 Page 39 of 73
+
+
+
+
+
+
+
+
+
+);iSourceNode->(iSourceNodeSessionId, (OsclAny*)context));PrepareDoSourceNodePrepareDoSinkDecCleanupSourcePrepareif (iState == PVP_ENGINE_STATE_TRACK_SELECTION_3_DONE)case PVP_CMD_SourceNodePrepare:HandleSourceNodePrepare触发DoSinkNodeQueryInterfaceOptional(iDatapathList[i], aNodeContext.iCmdId, aNodeContext.iCmdContext);AllocateEngineContext(&aDatapath, aDatapath.iSinkNode, 
+
+
+
+);aDatapath.iSinkNode->QueryInterface
+，主要就是调用srccode的Prepare处理； 
+，取得iSinkNodePVInterfaceMetadataExt控制对象； 
+ 
+?Tech, 2010-2-5 Page 40 of 73
+
+
+
+
+
+
+
+
+)DoDecNodeQueryInterfaceOptional  case PVP_CMD_SinkNodeQueryMetadataIF:PVPlayerEngine::NodeCommandCompletedif (iState == PVP_ENGINE_STATE_PREPARING)aDatapath.iDecNode->QueryInterface
+
+decnode的扩展接口aDatapath.iDecNodePVInterfaceMetadataExt；
+NodeCommandCompleted进入下一个状态，逻辑如下： 
+?Tech, 2010-2-5 Page 41 of 73
+
+
+
+DoDatapathPrepare，我们来看看这个函数的逻辑，如下： 
+
+
+
+aDatapath.iDatapa
+ aDatapath.iDatapath->SetSourceNode(iSourceNode);    aDatapath.iDatapath->SetSinkNode(aDatapath.iSinkNode);
+
+
+
+
+
+
+
+
+
+aDatapath.iDatapath设置观察者，这样datapath可以通过调用观察者的回调函数来通知引
+iDatapath设置源节点，解码节点，sink 节
+track信息，已经解码输出的格式等，最后调用iDatapath的Prepare函数，并在
+里面等待这个命令的完成； 
+dataPath的处理范围了，下面需要详细分析的是datapath的对于prepare的处理逻
+?Tech, 2010-2-5 Page 42 of 73
+
+
+ 
+层的prepare相关处理逻辑 
+
+prepare处理之前，我们先温习一下它本身在整个逻辑控制流中的位置，如下图： 
+
+node，并控制这些
+的状态变化的，它的处理通常都是调用其内部拥有的src，dec，sink 等node的对应函数来处理的，
+node它的内部调用函数序列大约都是这样的，请看： 
+?Tech, 2010-2-5 Page 43 of 73
+
+
+
+
+ 
+! 
+
+对于Prepare的处理分成以下几个阶段： 
+） 进入PREPARE_INIT状态以前的处理； 
+） PREPARE_INIT状态的逻辑； 
+） PREPARE_REQPORT状态的逻辑； 
+） PREPARE_CONNECT状态的逻辑； 
+） PREPARE_PREPARE状态的逻辑； 
+?Tech, 2010-2-5 Page 44 of 73
+
+
+ 
+
+
+进入PREPARE_INIT状态以前的处理 
+ 
+
+ 图4.5.1.0 
+MIO集成的需要，我只稍微描述了一下对于输出节点的ThreadLogon的逻辑，
+src，decode的Logon和connect各不相同，我也没去分析； 
+logon，实际上调用了其内部拥有的那个iMIOControl的ThreadLogon和
+函数，MIO的threadLogon里面只是设置了一个标志位，而在MIO的Connect函数里面
+MIO发生什么事情的时候，可以有一个人知道； 
+iMIOControl在什么时候建立的，那好吧，我们回头看看它的建立的逻辑，
+ 
+
+?Tech, 2010-2-5 Page 45 of 73
+
+
+
+ 图4.5.1.1 
+video输出的逻辑，在这个Create的过程中，这个iMIOControl就建立了，
+marvel的处理，这个iMIOControl其实就是AndroidSurfaceOutput类型的指针，用于代表
+对上提供的控制接口； 
+AndroidSurfaceOutput的类结构更清楚，在3.11节有讲； 
+
+图4.5.1.0里面有这么一句话： 
+iState = PREPARE_INIT; 
+状态成了PREPARE_INIT，通过 
+，于是启动了状态机的下一个状态处理，请看下一节； 
+状态的逻辑 
+sink和dec node的init函数，src节点的init处理在引擎层已经做了,逻辑
+ 
+?Tech, 2010-2-5 Page 46 of 73
+
+
+
+
+  
+PVPlayerDatapath::NodeCommandCompleted里面会调用： 
+
+
+ 
+状态的逻辑 
+port，而这些port就是用来传递数据的，或者说用来描述节点
+ 
+?Tech, 2010-2-5 Page 47 of 73
+
+
+
+
+
+
+
+
+PVMF_GENERIC_NODE_REQUESTPORTQueueCommandL(cmd);
+
+PVPlayerDatapath::IssueDatapathRequestPortOSCL_TRY(leavecode, aCmdId = aNode->RequestPort(aSessionId, aPortTag, aPortConfig, aContext));PVPlayerDatapath::Runcase PREPARE_REQPORT:
+
+port请求逻
+ 
+?Tech, 2010-2-5 Page 48 of 73
+
+
+
+
+
+
+
+
+
+
+
+
+
+类型赋值PVMediaOutputNode::DoRequestPortaCmd.PVMediaOutputNodeCmdBase::Parse(tag, mimetype);mimetypetagcase PVMF_MEDIAIO_NODE_INPUT_PORT_TAG:PVMediaOutputNodePort *port = OSCL_PLACEMENT_NEW(ptr, PVMediaOutputNodePort(this));port->ConfigurePVMediaOutputNodePort::ConfigurePVMediaOutputNode::ProcessCommandcase PVMF_GENERIC_NODE_REQUESTPORT:PVMediaOutputNode::RunCommandComplete(iCurrentCommand, iCurrentCommand.front(), PVMFSuccess);
+
+?Tech, 2010-2-5 Page 49 of 73
+
+
+PVPlayerDatapath::NodeCommandCompleted会被调用，于是取得node
+port，如下： 
+ = (PVMFPortInterface*)(aResponse.GetEventData()); 
+ = (PVMFPortInterface*)(aResponse.GetEventData()); 
+= (PVMFPortInterface*)(aResponse.GetEventData()); 
+= (PVMFPortInterface*)(aResponse.GetEventData()); 
+port非常重要，以后的数据流传递就全靠它们了； 
+ 
+  iState = PREPARE_CONNECT; 
+
+ 
+状态的逻辑 
+port，但是并没有对其进行配置。在这个状态做的事情，主要
+port所能接受的格式，参数等，然后相互连接起来，像这样： 
+
+ 
+source不一定就是文件，有可能是
+等，这块需要以后分析，下面来看看它们之间的连接过程，如下图所示：  
+?Tech, 2010-2-5 Page 50 of 73
+
+
+
+
+
+
+
+iSourceOutPort-
+，连接src
+deciDecOutPort->Connect连接dec到output
+
+
+
+
+iMediaTransfer->setPeer(this);FirstSecondPeerConnectDecodenodeconnectdecnodeconnectsinkportsink_port->peerConnect
+
+
+AndroidSurfaceOutput::createMediaTransfer
+
+ 这里对于我们所关心的MIO的传输问题，有一个很重要的数据结构，那就是iMediaTransfer,
+AndroidSurfaceOutput; 
+在连接完成后，就在这个run函数里面，调用了： 
+   iState = PREPARE_PREPARE; 
+     RunIfNotReady(); 
+ （这和多数情况通过NodeCommandCompleted来改变状态的情况不一样）； 
+ 于是进入了下一个状态； 
+?Tech, 2010-2-5 Page 51 of 73
+
+
+的逻辑 
+prepare函数，真正进入prepare状态了，如下图所示： 
+
+prepare，看看它的逻辑，也比较简单： 
+
+
+
+EInit);
+
+mediaTransfer = 
+
+
+
+
+
+
+MIO的init函数，在那里，设置一个状态，就开始宣称命令已经完成，于
+ 
+?Tech, 2010-2-5 Page 52 of 73
+
+
+
+ iObserver->HandlePlayerDatapathEvent(0, PVMFSuccess, iContext); 
+iObserver代表的是引擎层，于是引擎层，知道datapatch对于prepare的处理已经完毕了； 
+prepare状态还没有结束，只是现在需要回到引擎层了； 
+的收官之战 
+iObserver->HandlePlayerDatapathEvent(0, PVMFSuccess, iContext);于是控制权又回到了引擎
+ 
+
+
+
+HandlePlayerDatapathEvent
+
+
+First
+
+
+
+PVPlayerDatapath::NodeCommandCompletediObserver->HandlePlayerDatapathEvent
+
+
+PVP_CMD_Sou
+）DoSourceNodeStartFirstiSourceNode->StartSecondDoSourceNodeSetDataSourcePositionDoSourceNodeQueryDataSourcePositio
+
+
+
+datapath层的完成消息后会启动src node的start函数，换句话说，这里提前让src进入
+start状态，它的逻辑不简单，所以以后再分析吧，这里重点在于控制逻辑的分析，等src的start函数返回
+NodeCommandCompleted函数的执行，在这里还要触发datapath的start，逻辑如下： 
+?Tech, 2010-2-5 Page 53 of 73
+
+
+
+的处理也就是调用node层的start函数，包括sink以及可能的（如果有）decode的start函数； 
+output节点，它说做的就是调用MIO的start函数，在MIO层，设置状态位： 
+
+ 
+ 
+?Tech, 2010-2-5 Page 54 of 73
+
+
+
+PVP_ENGINE_STATE_PREPARED了；
+
+playerdriver层； 
+层在CommandCompleted函数里面的处理逻辑如下： 
+
+
+
+
+
+
+
+
+ mPvPlayer->sendEvent(MEDIA_PREPARED); 
+
+
+sendEvent通知mediaplayerservice层； 
+ 
+prepare了，接下来就是启动数据流了，也就是进入start状
+ 
+
+?Tech, 2010-2-5 Page 55 of 73
+
+
+流程的分析 
+本身架构对start的处理 
+PVPlayer层以上，都是简单的二传手，所以我就不想讨论了，只是简单的画了个示意图，如下： 
+
+
+
+
+到JNI层
+
+
+process_media_player_call( env, thiz, 
+
+mp->start()
+
+
+
+
+mPlayer->start();
+
+）
+Binder
+
+
+prepare本身差不了多少，都是一层一层的调用，中间还经过了binder才到service端，最后
+?Tech, 2010-2-5 Page 56 of 73
+
+
+PVPlayer的start来实现； 
+，下面看看PlayerDriver的处理 
+层的start流程 
+ 
+
+
+
+
+
+
+
+）
+case PlayerCommand::PLAYER_START:PlayerDriver::RunPvplayerhandleStartSetpriorityandroidmPlayer->Start(command)
+
+
+
+
+
+
+
+
+触发PVP_ENGINE_COMMAND_START
+
+start来实现的，不过这里有设置优先级； 
+引擎层的start处理 
+ 
+?Tech, 2010-2-5 Page 57 of 73
+
+
+
+， 启动sink的ClockStarted函数； 
+， 设置引擎状态； 
+， 通知PlayerDriver层状态更新； 
+sink的ClockStarted函数来，猜测应该是这里开启了最后的数据流的开关，在进入
+src，decode的开关都已经启动，但是数据流依然不会动，因为最后的开关由
+端来控制，简单说，如果一条水管由三个开关控制，分别较src，dec，sink，那么第一步，需要打开src
+dec，而最后才是sink，前面两步，在prepare阶段就已经做了，这里就是最后一步，我们来看
+ 
+?Tech, 2010-2-5 Page 58 of 73
+
+
+ iDatapathList[i].iSinkNodeSyncCtrlIF->ClockStarted();PVMediaOutputNode::ClockStartedPVMediaOutputNodePort::ClockStartedRunIfNotReady();触发主函数run的执行，在这里处理逻辑，包括数据 
+可以看到，终于，在最后的输出节点的输入port里面开始了数据的处理，在这里已经等候多时的数
+ 
+数据 的流动 
+PV的架构，数据的传递分成两种模式， 
+） tunnel模式； 
+） 非tunnel模式； 
+节的那个图有一点介绍，可以回去温习一下，下面具体讲； 
+的初始化 
+component都需要进行一定的初始化，比如缓冲区的分配，格式的设置等等，我们
+node层及以上讨论，没有下到component，现在我们来看看一般的component的初始化都
+ 
+?Tech, 2010-2-5 Page 59 of 73
+
+
+Node进行Prepare的时候，component所属有
+node会调用这些以“OMX_“开头的命令对各自的component进行初始化，命令序列就像上面那
+ 
+ 
+， 在node的prepare里面，比如PVMFStatus PVMFOMXBaseDecNode::DoPrepare，会先根据roles
+得component的名字，这里的role就是这样的字符串：audio_decoder.aac，
+等等；当然对于上层来说只需要识别出它的mime 字符串就行了，比如
+#define PVMF_MIME_H264_VIDEO "video/H264"，在解码node里面会自动根据
+video_decoder.avc，利用这个role去查询注册表，看能够胜任这种角色
+component有哪些？这里返回的都是以字符串描述的，它分两步，一步是取得每种role对
+component的个数，第二步调用同样的函数OMX_MasterGetComponentsOfRole来把这些
+ 
+， OMX_MasterConfigParser通过这个函数配置参数，这个函数又通过一个类似于注册表的代
+component的名字找到对应的pInterface，通过接口提供的
+实现，而marvel的系统提供了自己的实现，是通过pOMXConfigParser 
+"MRVLOMXConfigParser");方式取得的，也
+marvel自己提供了一个库来实现了这个函数，在marvel_omx_config_parser.cpp里
+audio_decoder还是video_decoder，再区分是
+audio或者什么类型的video，比如，对于 
+"video_decoder.wmv")) 
+
+?Tech, 2010-2-5 Page 60 of 73
+
+
+    aInputs.iMimeType = PVMF_MIME_WMV; 
+
+
+取得了Mime 类型再调用 
+int16 mrvl_video_config_parser(pvVideoConfigParserInputs 
+来处理，在这里面返回一些参数，比如宽度，
+profile，level等； 
+， 通过OMX_MasterGetHandle(&iOMXDecoder, (OMX_STRING) 
+
+创建component的handle；这里还有对于marvel的特殊处理，如果是marvel的
+就设置bIsMrvlOmxComp = true; 
+， 做一些例行检查，缓冲区分配等等，看上面的图就行了，我已经不关心了； 
+ 
+
+模式的数据流动 
+tunnel模式到底是什么意思，如下图所示： 
+?Tech, 2010-2-5 Page 61 of 73
+
+
+A1直接到B0，再从B1到C0，所谓0，1就是指输入和输出port； 
+ 
+
+tunnel模式，我们就讨论这么多了； 
+
+
+?Tech, 2010-2-5 Page 62 of 73
+
+
+非tunnel模式的数据流动 
+ 
+
+decoder时调用OMX_EmptyThisBuffer，需要从decoder取得数据时
+OMX_FillThisBuffer到component，然后component会分别通过EmptyBufferDone和FillBufferDone
+node层，empty结束或者fill 结束，在里面会把消息的数据加入到特定的队列，在run
+send函数发送，在里
+node的run函数来处理了，
+ 
+?Tech, 2010-2-5 Page 63 of 73
+
+
+
+
+
+
+
+
+
+
+tunnelPVMFOMXBaseDecNode::HandleProcessingStatecase EPVMFOMXBaseDecNodeProcessingState_ReadyToDecode:PVMFOMXBaseDecNode::RunSendOutputBufferToOMXComponentwhile (iOutPort->OutgoingMsgQueueSize())ProcessOutgoingMsgaPort->Send(iInPort->IncomingMsgQueueSize() > 0)...ProcessIncomingMsg(iInPort)nodeOMX_FillThisBuffer(iOMXDecoder, output_buf->pBufHdr);decoderiCallbacks.EmptyBufferDonecomponenttunnelPvmfPortBaseImpl::SendiConnectedPort
+->(iOutgoingQueue.iQ
+
+
+Connect
+IncomingQueue.iQ.push(aMsg);push
+
+，我们下面需要重点讨论的是和我们相关的数据如何从MIO输出的逻辑； 
+的数据处理 
+output node 的输出port，这时候，它会调用iMediaTransfer来传递数据，
+4.5.4节），后面 的逻辑如下： 
+
+?Tech, 2010-2-5 Page 64 of 73
+
+
+
+iMediaTransfer本质上就是AndroidSurfaceOutput于是进入到了MIO的控制范围内了； 
+writeFrameBuffer里面会对fb2有特别的处理，如下： 
+）如果使用了overlay并且处于屏幕的最上面，将会调用output2Overlay来函数来处理，从这个角
+ 
+通过overlay的surface取得这个区域的矩形区域描述，但是，这块目前的marvel代码里面并没有
+overlay2的创建，还没有完全实现； 
+?Tech, 2010-2-5 Page 65 of 73
+
+
+取得src的YUV地址以及长度； 
+判断是否需要旋转，方法为源地址的宽减高乘以目的地址的宽减高，如果小于0就需要旋转，
+ 
+）如果没有对fb2进行配置调用overlay2Config进行配置，这里面会有对fb2的打开，内存的
+，目标YUV的地址及长度的取得等； 
+）然后通过标准的M2D的操作把数据传到目的地，也就是fb2的地址； 
+
+ 
+
+
+ 
+
+同步问题 
+PV框架里面，工作流程如下图所
+ 
+
+ 
+?Tech, 2010-2-5 Page 66 of 73
+
+
+
+
+MIO的时候，都是有一个
+,MIO就去查询当前的clock的时
+500离时间戳上的1000少500ms，于是就起个timer，告诉它，500ms后叫醒我，于是就通过
+
+
+ 
+
+关于component的集成 
+marvel之间实现了一套解码code，所以必须要了解这个集成过程，它的主要代码在
+，omx_interface.h文件里面； 
+ 
+pv的架构对于解码器的控制都是通过一套以OMX_开头的函数来控制的，比如component
+OMX_ComponentNameEnum来实现的，比如初始化是通过OMX_Init来实现的； 
+openmax的AL层使用这些函数来访问
+component的时候就可以跳转到我们自己实现的解码器里面；也就是说，只要是提供一个库，
+PV的框架，那么它就会把你的库装载进来，然后通过动态库的
+dlsym等就可以访问这个库的接口；当然你必须要遵守它定的规则，那就是实现
+里面所要求的那些函数指针； 
+，有了上面的了解，我们来看看，目前的实现逻辑； 
+接口库的加载时机 
+setDataSource的时候（4.2节）会创建一个PVPLayer，但是我们并没有对它
+ 
+?Tech, 2010-2-5 Page 67 of 73
+
+
+
+
+
+进行装载（如果还没有装载的话），它的装载是通过OMX_MasterInit来实现的，这是一个典
+singleton模式，查询是否已经加载，没有就开始调用函数_Try_OMX_MasterCreate来创建，它再调用
+来初始化，这里分成两步， 
+ 
+omx_interface.h里面的函数指针的赋值过程； 
+动态库的加载 
+/system/etc目录里面查找.cfg的文件，如果找到，就从里面读出库的名字，比如对于marvel
+.cfg文件内如如下： 
+
+
+
+
+
+
+" 
+omx的接口库，它需要支持OMX_INTERFACE_ID接口，这在后面会将，先来
+ 
+?Tech, 2010-2-5 Page 68 of 73
+
+
+
+handle供后面使用； 
+的实现 
+ 
+?Tech, 2010-2-5 Page 69 of 73
+
+
+
+mrvl_omx_interface.cpp就是marvel单独实现的接口层，里面返回了一个MRVLOMXInterface
+SharedLibraryLookup函数判断这个instance是否支持
+，答案当然是了，于是返回了this指针，这里重要的是MRVLOMXInterface都
+ 
+?Tech, 2010-2-5 Page 70 of 73
+
+
+omx_interface.h里面的接口函数赋值了，可以看到这些函数的指针来自于另外两个库叫做
+libMrvlOmx.so”和”libMrvlOmxConfig.so“, 
+libMrvlOmx.so的生成是在vendor/marvell/generic/ipplib/omx/il里面的Mdroid.mk这里面可以看到
+mved还是不支持mved，分别包含不同的静态库，这些静态库才
+ 
+ 
+注册表的填充 
+singleton所拥有的注册表（data->iMasterRegistry 
+ 
+） 首先对所有支持omx_interface的实例进行遍历； 
+） 对每个实例调用OMX_Init进行初始化； 
+） 调用GetpOMX_ComponentNameEnum来取得component的名字，这个名字是根据一个索引来取
+ 
+
+
+
+index); 
+） 对上一步取得的名字调用GetpOMX_GetRolesOfComponent取得它所支持的role的个数，根据这
+ 
+） 再次调用GetpOMX_GetRolesOfComponent传入上一步分配的空间以取得具体的role，也就是支
+ 
+） 对于每一个component的每一个role都登记在案，如下： 
+
+
+
+
+
+
+
+
+component的名字； 
+component的role； 
+omx_interface的索引，也就是最外层的for循环的值； 
+component的索引，它会一直递增，注意它和master_index是不一样的，因为
+?Tech, 2010-2-5 Page 71 of 73
+
+
+component可能有好几个role； 
+master_index这个值描述的是注册表里面的项数，其中以role以及component联合
+primarykey； 
+，等大循环结束所以信息也都记录下来了，以供后面的查询； 
+component的时候，只需要传入component的名字，调用OMX_GetHandle
+handle了，它的原型如下： 
+
+ pHandle,    
+
+
+
+
+有了这个pHandle，就有了一切的控制权！！！  
+集成总结 
+ 
+， marvel提供的IPP写的component必须能注册进opencore，这一步就是第5章描述的，应该
+已经帮我们做好了； 
+， overlay2的集成，需要考虑，如何把fb2的surface整合进去，这样的话，在playerdriver设置
+的时候就可以设置fb2的surface了，调用到 MIO层的时候，就可以使用了，这步
+marvel还没有实现，需要我们自己做，具体就是要实现libhardware/modules/overlay里面
+overlay.cpp,不过从现在的patch可以看出marvel的思路是通过surfaceflinger来判断出是否
+fb2在最上面，然后在mio层直接控制fb2，压根不想通过android提供的标准的overlay.cpp
+omap的实现却是通过overlay.cpp的方式做的； 
+
+
+未分析 
+，关于track list的建立没有详细分析； 
+，Parser的工作原理没有分析； 
+， 其它，没有考虑到的； 
+ 
+
+
+1】，openmax_il_spec_1_1_2.pdf 
+2】，openmax_call_sequences.pdf 
+3】，pvplayer_developers_guide.pdf 
+4】，mio_developers_guide.pdf 
+5】，http://hi.baidu.com/wylhistory/blog/item/584fde248b69fd20d40742b2.html
+6】，http://hi.baidu.com/wylhistory/blog/item/b9f41cefc133233dacafd5c4.html
+7】，http://hi.baidu.com/wylhistory/blog/item/117c6b31bc8a52a35fdf0e34.html
+wylhistory 
+wylhistory@gmail.com 
+
+
+
+?Tech, 2010-2-5 Page 72 of 73
+
+
+
+?Tech, 2010-2-5 Page 73 of 73

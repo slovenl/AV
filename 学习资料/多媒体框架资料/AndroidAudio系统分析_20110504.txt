@@ -1,0 +1,681 @@
+
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 1 
+谷歌、高通、三星Audio的系统分析    版本历史 日期 版本 描述 作者 2011年1月08日 <0.1> 新建 王海斌  1. 概要 ........................................................................................................................................................................................... 2 2. GOOGLE ANDROID AUDIO HAL ...................................................................................................................................... 2 2.1 AUDIO系统综述 ............................................................................................................................................................... 2 2.2 AUDIO系统和上层接口 ................................................................................................................................................... 4 2.2.1 Audio系统的各个层次 ............................................................................................................................................ 4 2.2.2 media库中的Audio框架部分 ................................................................................................................................ 5 2.2.3 Audio Track .............................................................................................................................................................. 7 2.4.1 .1  AudioFlinger本地代码 ......................................................................................................................................... 15 2.4.1.2  Audio系统的JNI代码 .......................................................................................................................................... 45 2.4.1.3  Audio系统的Java代码 ......................................................................................................................................... 45 2.4.2  AUDIO的硬件抽象层 ...................................................................................................................................................... 45 2.4.2.1  Audio硬件抽象层（HAL）的接口定义 ............................................................................................................... 45 2.4.2.2   AudioFlinger中自带Audio硬件抽象层实现 ..................................................................................................... 47 2.4.2.3 Audio硬件抽象层的真正实现 .................................................................................................................................. 56 2.4.3 AUDIO HAL在ECLAIR/FROYO和DONUT的差异 ..................................................................................................... 56 2.4.4 ANDROID POLICY MANGER ......................................................................................................................................... 58 2.2.5 高通ANDROID的AUDIO HAL实现方式 ............................................................................................................... 59 2.2.5.1高通的ANDROID的AUDIO的架构 ............................................................................................................................... 59 2.2.5.2 高通ANDROID的AUDIO的具体实现 .......................................................................................................................... 60 2.2.6三星ANDROID的AUDIO HAL的实现方式 .................................................................................................................. 69 2.2.6.1三星ANDROID的架构 .................................................................................................................................................... 69 2.2.6.2三星针对C110 AUDIO的HAL具体实现 ..................................................................................................................... 70 参考资料 ......................................................................................................................................................................................... 85  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 2 
+Android Audio 系统分析   1. 概要 本文主要分析Google的原始Android的Audio的架构，比较Google的Android在1.6 Donut和 2.2 Froyo关于Audio差异，重点介绍Audio的HAL的架构以及高通如何针对自己的硬件平台（QSD8650/QSD8650A）来实现Audio的HAL和三星如何针对自己的硬件平台（S5PC110）来实现Audio的HAL。 在android的HAL中，这部分与芯片的功能联系十分紧密，所以一般的芯片厂商都是按照Google定义的HAL架构进行开发和维护，终端厂商一般不需要改动或只需要轻微的调整而不涉及到架构和接口的改变。对于Audio基本上也遵循这个原则。 本文最后结合高通的平台、三星的平台及其他平台的现有方案提出了LeOS实现能够兼容不同硬件平台的Audio的HAL的设计思路和方案。 2. Google Android audio HAL 本章首先基于Google的Android 1.6（Donut）来分析Google的Android中Audio层次架构，然后分析介绍Google Android 2.1/2.2(Eclair/Froyo)与1.6(Donut)的Audio的差异，再详细的介绍Audio的HAL部分。 2.1 Audio系统综述 此处主要分析Android音频系统的输入/输出环节，不涉及音频编解码的内容。Android音频系统从驱动程序、本地框架到Java框架都具有内容。Android的Audio系统不涉及编解码环节，只是负责上层系统和底层Audio硬件的交互，一般以PCM作为输入/输出格式。 Audio系统在Android中负责音频方面的数据流传输和控制功能，也负责音频设备的管理。Android的Audio系统的输入/输出层次一般负责播放PCM声音输出和从外部获取PCM声音，以及管理声音设备和设置。 Audio系统主要分成如下几个层次： （1）media库提供的Audio系统本地部分接口； （2）AudioFlinger作为Audio系统的中间层； （3）Audio的硬件抽象层（HAL）提供底层支持； （4）Audio接口通过JNI和Java框架提供给上层。 Audio系统的各个层次接口主要提供了两方面功能：放音（Track）和录音（Recorder）。 Android的Audio系统结构如图1所示。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 3 
+ 图1 Android的Audio系统结构 Android的Audio系统的代码分布情况如下所示： （1）Audio的Java框架部分 代码路径：frameworks/base/media/java/android/media 与Audio相关的Java包是android.media，主要包含AudioManager和Audio系统的几个类。 （2）Audio的JNI部分 代码路径：frameworks/base/core/jni 生成库libandroid_runtime.so，Audio的JNI是其中的一个部分。 （3）Audio的本地框架部分 头文件路径：frameworks/base/include/media/ 源代码路径：frameworks/base/media/libmedia/ Audio本地框架是media库的一部分，本部分内容被编译成库libmedia.so，提供Audio部分的接口（包括基于Binder的IPC机制）。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 4 
+（4）Audio Flinger 代码路径：frameworks/base/libs/audioflinger 这部分内容被编译成库libaudioflinger.so，它是Audio系统的本地服务部分。 （5）Audio的硬件抽象层接口 头文件路径：hardware/libhardware_legacy/include/hardware_legacy/ C++文件路径：hardware/msm7k/libaudio/ Audio硬件抽象层的实现在各个系统中可能是不同的，需要使用代码去继承相应的类并实现它们，作为Android系统本地框架层和驱动程序接口。 2.2 Audio系统和上层接口 在Android中，Audio系统自上而下由Java的Audio类、Audio本地框架类、AudioFlinger和Audio的硬件抽象层（HAL）几个部分组成。     先看看Audio里边有哪些东西？通过Android的SDK文档，发现主要有三个： 1) AudioManager：这个主要是用来管理Audio系统的 2) AudioTrack：这个主要是用来播放声音的 3) AudioRecord：这个主要是用来录音的      其中AudioManager的理解需要考虑整个系统上声音的策略问题，例如来电话铃声，短信铃声等。 一般看来，最简单的就是播放声音了。所以我们打算从AudioTrack开始分析。     2.2.1 Audio系统的各个层次 Audio系统的各层次情况如下所示。 Audio本地框架类是libmedia.so的一个部分，这些Audio接口对上层提供接口，由下层的本地代码去实现。 AudioFlinger继承libmeida中的接口，提供实现库libaudiofilnger.so。这部分内容没有自己的对外头文件，上层调用的只是libmedia本部分的接口，但实际调用的内容是libaudioflinger.so。 Audio使用JNI和Java对上层提供接口，JNI部分通过调用libmedia库提供的接口来实现。 Audio的硬件抽象层（HAL）提供到硬件的接口，供AudioFlinger调用。Audio的硬件抽象层实际上是各个平台开发过程中需要主要关注和独立完成的部分。 在Android的Audio系统中，无论上层还是下层，都使用一个管理类和输出输入两个类来表示整个Audio系统，输出输入两个类负责数据通道。在各个层次之间具有对应关系，如表1所示。   Audio管理环节 Audio输出 Audio输入 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 5 
+Java层 android.media.AudioSystem android.media.AudioTrack android.media.AudioRecorder 本地框架层 AudioSystem AudioTrack AudioRecorder AudioFlinger IAudioFlinger IAudioTrack IAudioRecorder 硬件抽象层（HAL） AudioHardwareInterface AudioStreamOut AudioStreamIn 表1 Android各个层次的对应关系 2.2.2 media库中的Audio框架部分 Android的Audio系统的核心框架在media库中提供，对上面主要实现AudioSystem、AudioTrack和AudioRecorder三个类。在AudioSystem，AudioTrack和AudioRecorder中，都可以获得IAudioFlinger( sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger())。AudioTrack和AudioRecorder通过audioFlinger创建IAudioTrack和IAudioRecorder 提供了IAudioFlinger类接口，在这个类中，可以获得IAudioTrack和IAudioRecorder两个接口，分别用于声音的播 放和录制。AudioTrack和AudioRecorder分别通过调用IAudioTrack和IAudioRecorder来实现。 Audio系统的头文件在frameworks/base/include/media/目录中，主要的头文件如下： AudioSystem.h：media库的Audio部分对上层的总管接口； IAudioFlinger.h：需要下层实现的总管接口； AudioTrack.h：放音部分对上接口； IAudioTrack.h：放音部分需要下层实现的接口； AudioRecorder.h：录音部分对上接口； IAudioRecorder.h：录音部分需要下层实现的接口。 Ixxx的接口通过AudioFlinger来实现，其他接口通过JNI向上层提供接口。 IAudioFlinger.h、IAudioTrack.h和IAudioRecorder.h这三个接口通过下层的继承来实现（即 AudioFlinger）。AudioSystem.h、AudioTrack.h和AudioRecorder.h是对上层提供的接口，它们既供本地程序调用（例如声音的播放器、录制器等），也可以通过JNI向Java层提供接口。 meida库中Audio部分的结构如图2所示。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 6 
+ 图2 meida库中Audio部分的结构 从功能上看，AudioSystem负责的是Audio系统的综合管理功能，而AudioTrack和AudioRecorder分别负责音频数据的输出和输入，即播放和录制。 AudioSystem.h中主要定义了一些枚举值和set/get等一系列接口。 在Audio系统的几个枚举值中，audio_routes是由单独的位来表示的，而不是由顺序的枚举值表示，因此这个值在使用过程中可以使用" 或"的方式。例如，表示声音可以既从耳机（EARPIECE）输出，也从扬声器（SPEAKER）输出，这样是否能实现，由下层提供支持。在这个类 中，set/get等接口控制的也是相关的内容，例如Audio声音的大小、Audio的模式、路径等。 AudioTrack是Audio输出环节的类，其中最重要的接口是write()。**************** AudioRecord是Audio输入环节的类，其中最重要的接口为read()。****************** AudioTrack和AudioRecord的read/write函数的参数都是内存的指针及其大小，内存中的内容一般表示的是Audio的原始数据（PCM数据）。这两个类还涉及Auido数据格式、通道数、帧数目等参数，可以在建立时指定，也可以在建立之后使用set()函数进行设置。 在libmedia库中提供的只是一个Audio系统框架，AudioSystem、 AudioTrack和AudioRecord分别调用下层的IAudioFlinger、IAudioTrack和IAudioRecord来实现。另外的一个接口是IAudioFlingerClient，它作为向IAudioFlinger中注册的监听器，相当于使用回调函数获取 IaudioFlinger运行时信息。  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 7 
+AudioTrack和AudioRecorder 都具有start，stop和pause等接口。前者具有write接口，用于声音的播放，后者具有read接口，用于声音的录制。AudioSystem用于Audio系统的控制工作，主要包含一些set和get接口，是一个对上层的类。 AudioSystem.h：       class AudioSystem       {            public:                  enum stream_type { // Audio 流的类型                        SYSTEM = 1,                        RING = 2,                        MUSIC = 3,                        ALARM = 4,                        NOTIFICATION = 5,                        BLUETOOTH_SCO = 6,                        ENFORCED_AUDIBLE = 7,                        NUM_STREAM_TYPES       };  2.2.3 Audio Track  2.2.3.1 AudioTrack（Java层） JAVA的AudioTrack类的代码在：    framework\base\media\java\android\media\AudioTrack.java中。 1.  AudioTrack API的使用例子       先看看使用例子，然后跟进去分析。       //根据采样率，采样精度，单双声道来得到frame的大小。       int bufsize = AudioTrack.getMinBufferSize(8000,    //每秒8000个点(采样率)                   AudioFormat.CHANNEL_CONFIGURATION_STEREO,   //双声道                       AudioFormat.ENCODING_PCM_16BIT);    //一个采样点16比特-2个字节      //注意，按照数字音频的知识，这个算出来的是一秒钟buffer的大小。      //创建AudioTrack      AudioTrack trackplayer = new AudioTrack(AudioManager.STREAM_MUSIC, 8000,                AudioFormat.CHANNEL_CONFIGURATION_ STEREO,                AudioFormat.ENCODING_PCM_16BIT,                bufsize,                    AudioTrack.MODE_STREAM); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 8 
+     trackplayer.play() ;//开始      trackplayer.write(bytes_pkg, 0, bytes_pkg.length) ;//往track中写数据      ….      trackplayer.stop();//停止播放      trackplayer.release();//释放底层资源。 这里需要解释：      AudioTrack中有MODE_STATIC和MODE_STREAM两种分类。 1) STREAM的意思是由用户在应用程序通过write方式把数据一次一次得写到audiotrack中。          这种方式的坏处就是总是在JAVA层和Native层交互，效率损失较大。 2) STATIC的意思是一开始创建的时候，就把音频数据放到一个固定的buffer，然后直接传给          audiotrack，后续就不用一次次得write了。AudioTrack会自己播放这个buffer中的数据。          这种方法对于铃声等内存占用较小，延时要求较高的声音来说很适用。 2. 分析之getMinBufferSize  //注意，这是个static函数       AudioTrack.getMinBufferSize(8000,//每秒8K个点           AudioFormat.CHANNEL_CONFIGURATION_STEREO,//双声道               AudioFormat.ENCODING_PCM_16BIT);     //调用native函数     native_get_min_buff_size--->在framework/base/core/jni/android_media_track.cpp中实现。     //音频中最常见的是frame这个单位------1个采样点的字节数*声道。     getMinBufSize函数完了后，我们得到一个满足最小要求的缓冲区大小。 3. 分析之new AudioTrack先看看调用函数：(java)      AudioTrack trackplayer = new AudioTrack(                AudioManager.STREAM_MUSIC, 8000,            AudioFormat.CHANNEL_CONFIGURATION_ STEREO,            AudioFormat.ENCODING_PCM_16BIT,            bufsize,                AudioTrack.MODE_STREAM);//一次一次写入       // 调用native层的native_setup，把WeakReference传进去了 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 9 
+         int initResult = native_setup(new WeakReference<AudioTrack>(this).......      上面函数调用最终进入了JNI层android_media_AudioTrack.cpp函数，其中有          AudioTrackJniStorage* lpJniStorage = new AudioTrackJniStorage();          jclass clazz = env->GetObjectClass(thiz);          lpJniStorage->mCallbackData.audioTrack_class = (jclass)env->NewGlobalRef(clazz);          lpJniStorage->mCallbackData.audioTrack_ref = env->NewGlobalRef(weak_this);          lpJniStorage->mStreamType = atStreamType;          //创建真正的AudioTrack对象          AudioTrack* lpTrack = new AudioTrack();          if (memoryMode == javaAudioTrackFields.MODE_STREAM) {                       //如果是STREAM流方式的话，把刚才那些参数设进去(AudioTrack.cpp的set())                       lpTrack->set(....audioCallback ,  //callback                                         &(lpJniStorage->mCallbackData), //callback data (user)                                        0,   // 共享内存，STREAM模式需要用户一次次写，所以就不用共享内存了             …..            } else if (memoryMode == javaAudioTrackFields.MODE_STATIC) {              //static模式，需要用户一次性把数据写进去，然后由audioTrack把数据读出来，              //所以需要一个共享内存, 指C++AudioTrack和AudioFlinger之间共享的内容              //因为真正播放的工作是由AudioFlinger来完成的。              lpJniStorage->allocSharedMem(buffSizeInBytes);  //native AudioTrack分配共享内存？              lpTrack->set( …, audioCallback,  //callback                                 &(lpJniStorage->mCallbackData), //callback data (user);                                lpJniStorage->mMemBase,// shared mem                                ….)          }         //这样，Native层的AudioTrack对象就和JAVA层的AudioTrack对象关联起来了。        env->SetIntField(thiz, javaAudioTrackFields.nativeTrackInJavaObj, (int)lpTrack);        env->SetIntField(thiz, javaAudioTrackFields.jniData, (int)lpJniStorage); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 10 
+1) AudioTrackJniStorage详解       这个类其实就是一个辅助类，但是里边有一些知识很重要，尤其Android封装的一套共享内存的机制。把这块搞清楚了，我们就能轻松得在两个进程间进行内存的拷贝。           struct audiotrack_callback_cookie {                  jclass   audioTrack_class;                  jobject  audioTrack_ref;           };   cookie其实就是把JAVA中的一些东西保存了下，没什么特别的意义           class AudioTrackJniStorage {                 public:                      sp<MemoryHeapBase>  mMemHeap;  //这两个Memory很重要                      sp<MemoryBase>  mMemBase;                      audiotrack_callback_cookie mCallbackData;                      int   mStreamType;                      bool allocSharedMem(int sizeInBytes) {                           mMemHeap = new MemoryHeapBase(sizeInBytes, 0, "...");                           mMemBase = new MemoryBase(mMemHeap, 0, sizeInBytes);                        //注意用法，先弄一个HeapBase，再把HeapBase传入到MemoryBase中去。                           return true;                     }          }; 2) MemoryHeapBase        MemroyHeapBase是Android的一套基于Binder机制的对内存操作的类。既然是Binder机制，那么肯定有一个服务端（Bnxxx），一个代理端Bpxxx。看看MemoryHeapBase定义：        class MemoryHeapBase : public virtual BnMemoryHeap         //果然，从BnMemoryHeap派生，那就是Bn端。这样就和Binder挂上钩了       //Bp端调用的函数最终都会调到Bn这来      MemoryHeapBase提供了几个函数，可以获取共享内存的大小和位置。              getBaseID()--->返回mFd，如果为负数，表明刚才创建共享内存失败了              getBase()->返回mBase，内存位置              getSize()->返回mSize，内存大小 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 11 
+    有了MemoryHeapBase，又搞了一个MemoryBase，这又是一个和Binder机制挂钩的类。这个类就是一个能返回当前Buffer中写位置（就是offset）的方便类       class MemoryBase : public BnMemory        明白上面两个MemoryXXX，我们可以猜测下大概的使用方法了。      (1)BnXXX端先分配BnMemoryHeapBase和BnMemoryBase，      (2)然后把BnMemoryBase传递到BpXXX      (3)BpXXX就可以使用BpMemoryBase得到BnXXX端分配的共享内存了。       注 意，既然是进程间共享内存，那么Bp端肯定使用memcpy之类的函数来操作内存，这些函数是没有同步保护的，而且Android也不可能在系统内部为这 种共享内存去做增加同步保护。所以看来后续在操作这些共享内存的时候，肯定存在一个跨进程的同步保护机制。我们在后面讲实际播放的时候会碰到。 另外，这里的SharedBuffer最终会在Bp端也就是AudioFlinger那用到。 3) 分析之play和write    JAVA层就是调用play和write了。JAVA层这两个函数没什么内容，直接转到native层干活了。 先看看play函数对应的JNI函数 static void android_media_AudioTrack_start(JNIEnv *env, jobject thiz) {       //看见没，从JAVA那个AudioTrack对象获取保存的C++层的AudioTrack对象指针       AudioTrack *lpTrack = (AudioTrack *)env->GetIntField(               thiz, javaAudioTrackFields.nativeTrackInJavaObj);       lpTrack->start(); //这个以后再说 } 下面是write。我们写的是short数组， static jint  android_media_AudioTrack_native_write_short(...) {     return (android_media_AudioTrack_native_write()/ 2); } 根据Byte还是Short封装了下，最终会调到重要函数writeToTrack JAVA层的AudioTrack，无非就是调用write函数，而实际由JNI层的C++ AudioTrack write数据。 2.2.3.2 AudioTrack（C++层） 接上面的内容，我们知道在JNI层，有以下几个步骤： 1) new AudioTrack 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 12 
+2) 调用set()，把AudioTrackJniStorage等信息传进去 3) 调用了AudioTrack->start() 4) 调用AudioTrack->write() 那么，我们就看看真正干活的的C++AudioTrack吧。 AudioTrack.cpp位于AudioTrack.cpp 1.  new AudioTrack()和set调用JNI层调用的是最简单的构造函数：     AudioTrack::AudioTrack()         :mStatus(NO_INIT) //把状态初始化成NO_INIT。Android大量使用了设计模式中的state。    {    }    接下来调用set。我们看看JNI那set了什么    lpTrack->set(             atStreamType, //应该是Music吧             sampleRateInHertz,  //8000             format,   // 应该是PCM_16吧             channels,   //立体声=2             frameCount, //             0,   // flags             audioCallback, //JNI中的一个回调函数             &(lpJniStorage->mCallbackData), //回调函数的参数             0, // 通知回调函数，表示AudioTrack需要数据，不过暂时没用上             0,  //共享buffer地址，stream模式没有             true);//回调线程可以调JAVA的东西  set函数详解：#######三个点：(1)getOutput (2)createTrack (3)new AudioTrackThread status_t AudioTrack::set() {       ...前面一堆的判断，等以后讲AudioSystem再说     audio_io_handle_t output =                AudioSystem::getOutput(); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 13 
+               //createTrack？看来这是真正干活的                status_t status = createTrack(...., output);               //cbf是JNI传入的回调函数audioCallback               if (cbf != 0) { //看来，怎么着也要创建这个线程了！                        mAudioTrackThread = new AudioTrackThread(*this, threadCanCallJava);               }         看看真正干活的createTrack        status_t AudioTrack::createTrack() {             //和audioFlinger挂上关系             const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();             sp<IAudioTrack> track = audioFlinger->createTrack();             //从track也就是AudioFlinger那边得到一个IMemory接口, 这个是最终write写入的地方             sp<IMemory> cblk = track->getCblk();  //从audioFlinger得到buffer？YES!!!!             mCblkMemory.clear();  //sp<XXX>的clear，就看着做是delete XXX吧             mCblkMemory = cblk;             mCblk = static_cast<audio_track_cblk_t*>(cblk->pointer());             if (sharedBuffer == 0) {  //共享内存                  //buffer相关。STREAM模式没有传入共享buffer，但是数据确实需要buffer承载。                  //AudioTrack是没有创建buffer，那只能是刚才从AudioFlinger中得到的buffer了。                 mCblk->buffers = (char*)mCblk + sizeof(audio_track_cblk_t);            } else {                 mCblk->buffers = sharedBuffer->pointer();                 mCblk->stepUser(mCblk->frameCount);             }       }         MemoryXXX没有同步机制，所以应该有一个东西能体现同步的，在audio_track_cblk_t结构中。它的头文件在framework/base/include/private/media/AudioTrackShared.h       AudioTrack得到AudioFlinger中的一个IAudioTrack对象，这里边有一个audio_track_cblk_t，它包括
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 14 
+一块缓冲区地址，包括一些进程间同步的内容，可能还有数据位置等内容。AudioTrack启动了一个线程，叫AudioTrackThread。AudioTrack调用write函数，肯定是把数据写到那块共享缓冲了，然后IAudioTrack在另外 一个进程AudioFlinger中接收数据，并最终写到音频设备中。      那AudioTrackThread干什么了。           mAudioTrackThread = new AudioTrackThread(*this, threadCanCallJava);      反正最终会调用AudioTrackAThread的threadLoop函数。      先看看构造函数           AudioTrackThread(AudioTrack& receiver,   bool bCanCallJava)                 : Thread(bCanCallJava), mReceiver(receiver)           {      //mReceiver就是AudioTrack对象                   // bCanCallJava为TRUE           }       AudioTrackThread的启动由AudioTrack的start函数触发。       void AudioTrack::start()   {           //start调用AudioTrackThread函数，执行mAudioTrackThread的threadLoop           sp<AudioTrackThread> t = mAudioTrackThread;           t->run("AudioTrackThread", THREAD_PRIORITY_AUDIO_CLIENT);           //让AudioFlinger中的track也start           status_t status = mAudioTrack->start();      }      bool AudioTrack::AudioTrackThread::threadLoop()  {            //调用AudioTrack的processAudioBuffer函数             return mReceiver.processAudioBuffer(this);     }     难道真的有两处在write数据？看来必须得到mCbf去看看了，传的是EVENT_MORE_DATA标志。 mCbf由set的时候传入C++的AudioTrack，实际函数是： static void audioCallback(int event, void* user, void *info) {        if (event == AudioTrack::EVENT_MORE_DATA) {        //这个函数没往里边写数据        AudioTrack::Buffer* pBuff = (AudioTrack::Buffer*)info; 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 15 
+       pBuff->size = 0;  }       看来就只有用户的write会真正的写数据了，这个AudioTrackThread除了通知一下，也没什么实际有意义的操作了。 2. writessize_t AudioTrack::write(const void* buffer, size_t userSize)       够简单，就是obtainBuffer，memcpy数据，然后releasBuffer 2.2.3.3 AudioTrack总结     看起来，最重要的工作是在AudioFlinger中做的。 1) AudioTrack被new出来，然后set了一堆信息，同时会通过Binder机制调用另外一端的 AudioFlinger，得到IAudioTrack对象，通过它和AudioFlinger交互。 2) 调用start函数后，会启动一个线程专门做回调处理，代码里边也会有那种数据拷贝的回调，但是JNI层的回调 函数实际并没有往里边写数据，大家只要看write就可以了 3) 用户一次次得write，那AudioTrack无非就是把数据memcpy到共享buffer中。可想而知，AudioFlinger那一定有一个线程在memcpy数据到音频设备中去。我们拭目以待。   2.2.4      AudioFlinger本地代码 AudioFlinger是Audio系统的中间层，在系统中起到服务作用，它主要作为libmedia提供的Audio部分接口的实现，其代码路径为： frameworks/base/libs/audioflinger AudioFlinger的核心文件是AudioFlinger.h和AudioFlinger.cpp，提供了类AudioFlinger，这个类是一个IAudioFlinger的实现。  AudioFlinger主要提供createTrack()创建音频的输出设备IAudioTrack，openRecord()创建音频的输入设备IAudioRecord。另外包含的就是一个get/set接口，用于控制。 从工作的角度看，AudioFlinger在初始化之后，首先获得放音设备，然后为混音器（Mixer）建立线程，接着建立放音设备线程，在线程中获得放音设备。(不是很理解) 在AudioFlinger的AudioResampler.h中定义了一个音频重取样器工具类。这个音频重取样工具包含3种质量：低等质量（LOW_QUALITY）将使用线性差值算法实现；中等质量（MED_QUALITY）将使用立方差值算法实现；高等质量（HIGH_ QUALITY）将使用FIR（有限阶滤波器）实现。AudioResampler中的AudioResamplerOrder1是线性实 现，AudioResamplerCubic.*文件提供立方实现方式，AudioResamplerSinc.*提供FIR实现。 AudioMixer.h和AudioMixer.cpp中实现的是一个Audio系统混音器，它被AudioFlinger调用，一般用于在声音输出之前的处理，提供多通道处理、声音缩放、重取样。AudioMixer调用了AudioResampler。 AudioFlinger本身的实现通过调用下层的Audio硬件抽象层（HAL）的接口来实现具体的功能，各个接口之间具有对应关系。  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 16 
+  2.2.4.1 目的   AudioTrack作为AF（AudioFlinger）的客户端，来看看AF是如何完成工作的。在 AT（AudioTrack）中，涉及到的都是流程方面的事务，而不是系统Audio策略上的内容。因为AT是AF的客户端，而AF是 Android系统中Audio管理的中枢。对于分析AT来说，只要能把它的调用顺序（也就是流程说清楚就可以了），但是对于AF的话，简单的分析调用流程 是不够的。因为手机上的声音交互和管理是一件比较复杂的事情。举个简单例子，当听music的时候来电话了，声音处理会怎样？      虽然在Android中，还有一个叫AudioPolicyService的（APS）东西，但是它最终都会调用到AF中去，因为AF实际创建并管理了硬件设备。  2.2.4.2 从AT切入到AF 1. AudioFlinger的诞生 AF是一个服务，代码在framework/base/media/mediaserver/Main_mediaServer.cpp中。      int main(int argc, char** argv)     {          …...          AudioFlinger::instantiate();          MediaPlayerService::instantiate();          CameraService::instantiate();          AudioPolicyService::instantiate();          …..     }      为何AF，APS要和MediaService和CameraService都放到一个篮子里？看看AF的实例化静态函数，在framework/base/libs/audioFlinger/audioFlinger.cpp中     void AudioFlinger::instantiate() {         defaultServiceManager()->addService(                 String16("media.audio_flinger"), new AudioFlinger());     } 再来看看它的构造函数是什么做的。     AudioFlinger::AudioFlinger(): BnAudioFlinger(),   //初始化基类 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 17 
+              mAudioHardware(0),    //audio硬件的HAL对象               mMasterVolume(1.0f), mMasterMute(false), mNextThreadId(0) {         mHardwareStatus = AUDIO_HW_IDLE;         //创建代表Audio硬件的HAL对象         mAudioHardware = AudioHardwareInterface::create(); //和硬件挂钩         mHardwareStatus = AUDIO_HW_INIT;         if (mAudioHardware->initCheck() == NO_ERROR) {             setMode(AudioSystem::MODE_NORMAL);             //设置系统的声音模式等，其实就是设置硬件的模式             setMasterVolume(1.0f);             setMasterMute(false);         }     } AF中经常有setXXX的函数，到底是干什么的呢？我们看看setMode函数。     status_t AudioFlinger::setMode(int mode) {         mHardwareStatus = AUDIO_HW_SET_MODE;         status_t ret = mAudioHardware->setMode(mode);//设置硬件的模式         mHardwareStatus = AUDIO_HW_IDLE;         return ret;     }       当然，setXXX还有些别的东西，但基本上都会涉及到硬件对象。Android系统启动的时候，看来AF也准备好硬件了。不过，创建硬件对象就代表可以播放了吗？  2.  AT调用AF的流程     我这里简单的把AT调用AF的流程列一下，待会按这个顺序分析AF的工作方式。 1) 创建     AudioTrack* lpTrack = new AudioTrack();  //JNI     lpTrack->set(...); 这个就进入到C++的AT了。下面是AT的set函数     audio_io_handle_t output =                  AudioSystem::getOutput ((AudioSystem::stream_type)streamType,...);                      status_t status = createTrack(streamType, sampleRate, ..., sharedBuffer, output); ----->creatTrack会和AF打交道。我们看看createTrack重要语句     const sp &audioFlinger = AudioSystem::get_audio_flinger();     //下面很重要，调用AF的createTrack获得一个IAudioTrack对象     sp<IAudioTrack> track = audioFlinger->createTrack();     sp<IMemory> cblk = track->getCblk();    //获取共享内存的管理结构       总结一下创建的流程，AT调用AF的createTrack获得一个IAudioTrack对象，然后从这个对象中获得共享内存的对象。 2) 2. start和write     看看AT的start，估计就是调用IAudioTrack的start吧？     void AudioTrack::start()  { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 18 
+        status_t status = mAudioTrack->start();     }     那write呢?我们之前讲了，AT就是从共享buffer中:         l Lock缓存         l 写缓存         l Unlock缓存     注意，这里的Lock和Unlock是有问题的，什么问题呢?待会我们再说。按这种方式的话，那么AF一定是有一个线程在那也是：         l Lock，         l 读缓存，写硬件         l Unlock 总之，我们知道了AT的调用AF的流程了。下面一个一个看。  3. AF流程  1) 1 createTrack---真正干活的地方     sp<IAudioTrack> AudioFlinger::createTrack(             pid_t pid,   //AT的pid号(client)             int streamType,     //MUSIC，流类型             uint32_t sampleRate,   //8000 采样率             int format,     //PCM_16类型             int channelCount,      //2，双声道             int frameCount,      //需要创建的buffer可包含的帧数             uint32_t flags,             const sp& sharedBuffer,       //AT传入的共享buffer，这里为空(Stream模式)             int output,       //这个是从AuidoSystem获得的对应MUSIC流类型的索引             status_t *status)        {           {             Mutex::Autolock _l(mLock);             //获得线程？ //在openOutput()中new MixerThread(mPlaybackThread.add)              PlaybackThread *thread = checkPlaybackThread_l(output);              //看看这个进程是不是已经是AF的client了                   DefaultKeyedVector< pid_t pid, wp<Client> >    mClients;  //map             //这里说明一下，由于是C/S架构，那么作为服务端的AF肯定有地方保存作为C的AT的信息             //那么，AF是根据pid作为客户端的唯一标示的mClients是一个类似map的数据组织结构             wclient = mClients.valueFor(pid);             if (wclient != NULL) {             } else { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 19 
+                //如果还没有这个客户信息，就创建一个，并加入到map中去                 client = new Client(this, pid);                 mClients.add(pid, client);             }             //从刚才找到的那个线程对象中创建一个track             track = thread->createTrack_l(client, streamType, sampleRate, format,                       channelCount, frameCount, sharedBuffer, &lStatus);         }         //还有一个trackHandle，而且返回到AT端的是这个trackHandle对象         trackHandle = new TrackHandle(track);         return trackHandle;     } 这个AF函数中，突然冒出来了很多新类型的数据结构。先进入到checkPlaybackThread_l看看。     AudioFlinger::PlaybackThread *AudioFlinger::checkPlaybackThread_l(int output) const     {      DefaultKeyedVector< int output, sp<PlaybackThread> >  mPlaybackThreads;          PlaybackThread *thread = NULL;         //看到indexOfKey的东西，应该想到：这可能是一个map之类的东西，根据key能找到value         if (mPlaybackThreads.indexOfKey(output) >= 0) {             thread = (PlaybackThread *)mPlaybackThreads.valueFor(output).get();         } ############//openOutput()才会执行 mPlaybackThreads.add() 注意         //这个函数的意思是根据output值，从一堆线程中找到对应的那个线程         return thread;     }     看到这里很疑惑啊：         l AF的构造函数中没有创建线程，只创建了一个audio的HAL对象         | 如果AT是AF的第一个客户的话，刚才的调用流程里边，也没看到创建线程的地方呀。         l output是个什么玩意儿？为什么会根据它作为key来找线程呢？     看来，我们得去Output的来源那看看了。output的来源是由AT的set函数得到的：如下：     audio_io_handle_t output = AudioSystem::getOutput(streamType, ...); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 20 
+    然后调用AT自己的createTrack，最终把这个output值传递到AF了。其中audio_io_handle_t类型就是一个int类型。     进到AudioSystem::getOutput看看。注意，这是系统的第一次调用,而且发生在AudioTrack那个进程里边。 AudioSystem的位置在framework/base/media/libmedia/AudioSystem.cpp中     audio_io_handle_t AudioSystem::getOutput(stream_type stream,...) {         audio_io_handle_t output = 0;         if ()  {             Mutex::Autolock _l(gLock);             //根据我们的参数，会走到这个里边. 又是从map中找到stream=music的output。             //可惜啊，我们是第一次进来, output一定是0             output = AudioSystem::gStreamOutputMap.valueFor(stream);         }         if (output == 0) {             //到audioPolicyService(APS), 由它去getOutput #####重点啊！！！！！             const sp<>& aps = AudioSystem::get_audio_policy_service();             output = aps->getOutput(stream, samplingRate, format, channels, flags);             if ((flags & AudioSystem::OUTPUT_FLAG_DIRECT) == 0) {                 Mutex::Autolock _l(gLock);                 //如果取到output了，再把output加入到AudioSystem维护的这个map中去                 //说白了，就是保存一些信息吗。免得下次又这么麻烦去骚扰APS！                 AudioSystem::gStreamOutputMap.add(stream, output);             }         }         return output;     }     需要到APS中才能找到output的信息？那先得看看APS是如何创建的。刚才看到是和AF一块在Main_mediaService.cpp中实例化的。     AudioPolicyService::AudioPolicyService()                    : BnAudioPolicyService() , mpPolicyManager(NULL)   { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 21 
+        mTonePlaybackThread = new AudioCommandThread(String8(""));         mAudioCommandThread = new AudioCommandThread(                                  String8("ApmCommandThread"));         #if (defined GENERIC_AUDIO) || (defined AUDIO_POLICY_TEST)             //使用普适的AudioPolicyManager，把自己this做为参数             mpPolicyManager = new AudioPolicyManagerBase(this);             //使用硬件厂商提供的特殊的AudioPolicyManager             //mpPolicyManager = createAudioPolicyManager(this);         }     }     看看AudioManagerBase的构造函数吧。     AudioPolicyManagerBase(AudioPolicyClientInterface *clientInterface)                 : mPhoneState(AudioSystem::MODE_NORMAL), mRingerMode(0),                   mMusicStopTime(0),   mLimitRingtoneVolume(false)     {         mpClientInterface = clientInterface; //这个client就是APS，刚才通过this传进来了         AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor();         outputDesc->mDevice = (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER;         mHardwareOutput = mpClientInterface->openOutput(&outputDesc->mDevice,...);         // openOutput又交给APS的openOutput来完成了，真绕....     }     还是得回到APS，     audio_io_handle_t AudioPolicyService::openOutput(uint32_t *pDevices, …)  {         sp af = AudioSystem::get_audio_flinger();         //绕了这么一个大圈子，竟然回到AudioFlinger中了啊？？         return af->openOutput(pDevices, pSamplingRate, ...);  //device是speaker     }     在我们再次被绕晕之后，我们回眸看看足迹吧： 1) 在AudioTrack中，调用set函数 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 22 
+2) 这个函数会通过AudioSystem::getOutput来得到一个output的句柄 3) AS的getOutput会调用AudioPolicyService的getOutput 4) APS创建的时候会创建一个AudioManagerBase，AMB的创建又会调用APS的openOutput。 5) APS的openOutput又会调用AudioFlinger的openOutput      有一个疑问，AT中set参数会和APS构造时候最终传入到AF的openOutput一样吗？如果不一样，那么构造时候openOutput的又是什么参数呢？应该不一样把？？？     先放下这个悬念，我们继续从APS的getOutPut看看。     audio_io_handle_t AudioPolicyService::getOutput(AudioSystem::stream_type stream,...)     {         Mutex::Autolock _l(mLock);         //自己又不干活，由AudioManagerBase干活         return mpPolicyManager->getOutput(stream, samplingRate, format, channels, flags);     }     进去看看吧     audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type,...)     {         // open a non direct output         output = mHardwareOutput; //这个是在哪里创建的？在AMB构造的时候..         return output;     }    具体AMB的分析待以后Audio系统策略的时候我们再说吧。在APS构造的时候会open一个Output，而这个Output又会调用AF的openOutput。     int AudioFlinger::openOutput(uint32_t *pDevices, …) {         ....         Mutex::Autolock _l(mLock);         //由Audio硬件HAL对象创建一个AudioStreamOut对象         AudioStreamOut *output = mAudioHardware->openOutputStream(*pDevices, ...);         mHardwareStatus = AUDIO_HW_IDLE;         if (output != 0) { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 23 
+            //创建一个Mixer线程             //启机后，device默认speaker，创建new MixerThread             //new AudioTrack，set(), getOutput, openoutput, new MixerThread             thread = new MixerThread(this, output, ++mNextThreadId);         }         //终于找到了，把这个线程加入线程管理组织中         mPlaybackThreads.add(mNextThreadId, thread);         return mNextThreadId;     }     看来AT在调用AF的createTrack的之前，AF已经在某个时候把线程创建好了，而且是一个Mixer类型的线程，看来和混音有关系呀。 这个似乎和我们开始设想的AF工作有点联系喔。Lock，读缓存，写Audio硬件，Unlock。可能都是在这个线程里边做的。 2) 继续createTrack     AudioFlinger::createTrack(pid_t pid,..., const sp & sharedBuffer, int output,...) {           ...         {             //假设我们找到了对应的线程             Mutex::Autolock _l(mLock);             PlaybackThread *thread = checkPlaybackThread_l(output);             //晕，调用这个线程对象的createTrack_l             track = thread->createTrack_l(client, streamType, sampleRate, format,                        channelCount, frameCount, sharedBuffer, &lStatus);         }           trackHandle = new TrackHandle(track);         return trackHandle；//注意，这个对象是最终返回到AT进程中的。     }     进去看看thread->createTrack_l吧。_l的意思是这个函数进入之前已经获得同步锁了。     AudioFlinger::PlaybackThread::createTrack_l()  {         {   // scope for mLock             Mutex::Autolock _l(mLock); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 24 
+            //new 一个track对象, 注意sharedBuffer，此时的值应是0             track = new Track(this, client, ..., sharedBuffer);             mTracks.add(track); //把这个track加入到数组中，是为了管理用的。         }         lStatus = NO_ERROR;         return track;     }     看到这个数组的存在，我们应该能想到什么吗？这时已经有：              一个MixerThread，内部有一个数组保存track的  //MixerThread继承自playbackThread     看来，不管有多少个AudioTrack，最终在AF端都有一个track对象对应，而且这些所有的track对象都会由一个线程对象来处理。----难怪是Mixer啊#######（最多有32个）     再去看看new Track，我们一直还没找到共享内存在哪里创建的！！！     PlaybackThread::Track::Track()  {         //mCblk !=NULL?什么时候创建的？？只能看基类TrackBase         if (mCblk != NULL) {             mVolume[0] = 1.0f;             mVolume[1] = 1.0f;             mStreamType = streamType;             mCblk->frameSize = AudioSystem::isLinearPCM(format) ? channelCount *                           sizeof(int16_t) : sizeof(int8_t);         }     }     看看基类TrackBase干嘛了     TrackBase::TrackBase() {         size_t size = sizeof(audio_track_cblk_t);         size_t bufferSize = frameCount*channelCount*sizeof(int16_t);         if (sharedBuffer == 0) {             size += bufferSize;         }         //调用client的allocate函数。Client是在CreateTrack中创建的Client, 会创建一块共享内存 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 25 
+        mCblkMemory = client->heap()->allocate(size);         // 有了共享内存，但是还没有里边有同步锁的那个对象audio_track_cblk_t         mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer());         new(mCblk) audio_track_cblk_t();         //这就是C++语法中的placement new。new后面的括号中是一块buffer，再后面是一个类的构造函数。placement new就是在这块buffer中构造一个对象。普通new是没法让一个对象在某块指定的内存中创建的。这样，申请了一块共享内存，再在这块内存上创建一个对象。这样，这个对象不也就能在两个内存中共享了吗？怎么想到的？         // clear all buffers         mCblk->frameCount = frameCount;         mCblk->sampleRate = sampleRate;         mCblk->channels = (uint8_t)channelCount;     }     解决一个重大疑惑，跨进程数据共享数据结构audio_track_cblk_t是通过placement new在一块共享内存上来创建的。     回到AF的CreateTrack，有这么一句话：trackHandle = new TrackHandle(track);     return trackHandle；//注意，这个对象是最终返回到AT进程中的。     trackHandle的构造使用了thread->createTrack_l的返回值。 3. 到底有多少种对象     读到这里的人，一定会被异常多的class类型，内部类，继承关系搞疯掉。 1) AudioFlinger     class AudioFlinger : public BnAudioFlinger, public IBinder::DeathRecipient     AudioFlinger类是代表整个AudioFlinger服务的类，其余所有的工作类都是通过内部类的方式在其中定义的。你把它当做一个壳子。 2) Client     Client是描述C/S结构的C端的代表，也就算是一个AT在AF端的对等物吧。不过可不是Binder机制中的BpXXX喔。因为AF是用不到AT的功能的。     class Client : public RefBase {         public:             sp<AudioFlinger> mAudioFlinger;   //代表S端的AudioFlinger             sp<MemoryDealer> mMemoryDealer;  //每个C端使用的共享内存，通过它分配 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 26 
+            pid_t  mPid;   //C端的进程id     }; 3) TrackHandle     Trackhandle是AT端调用AF的CreateTrack得到的一个基于Binder机制的Track。TrackHandle实际上是对真正干活的PlaybackThread::Track的跨进程支持的封装。本来PlaybackThread::Track是真正在AF中干活的东西，不过为了支持跨进程，用TrackHandle对其进行了包转。这样在AudioTrack调用TrackHandle的功能，实际都由TrackHandle调用PlaybackThread::Track 来完成了。可以认为是一种Proxy模式吧。 这个就是AudioFlinger异常复杂的一个原因！！！     class TrackHandle : public android::BnAudioTrack {         public:             TrackHandle(const sp& track);             virtual ~TrackHandle();             virtual status_t  start();             virtual void stop();             virtual void flush();             virtual void mute(bool);             virtual void pause();             virtual void setVolume(float left, float right);             virtual sp getCblk() const;             sp<PlaybackThread::Track> mTrack;     }; 4) 线程类     AF中有好几种不同类型的线程，分别有对应的线程类型：     (1)RecordThread：         RecordThread : public ThreadBase, public AudioBufferProvider         用于录音的线程。     (2)PlaybackThread:         class PlaybackThread : public ThreadBase         用于播放的线程     (3)MixerThread 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 27 
+        MixerThread : public PlaybackThread         用于混音的线程，注意他是从PlaybackThread派生下来的。     (4)DirectoutputThread         DirectOutputThread : public PlaybackThread         直接输出线程，DIRECT_OUTPUT之类的判断，最终和这个线程有关。     (5)DuplicatingThread：         DuplicatingThread : public MixerThread         复制线程？而且从混音线程中派生？暂时不知道有什么用      这么多线程，都有一个共同的父类ThreadBase，这个是AF对Audio系统单独定义的一个以Thread为基类的类。  5) PlayingThread的内部类Track     TrackHandle构造用的那个Track是PlayingThread的createTrack_l得到的。      class Track : public TrackBase  // TrackBase是ThreadBase定义的内部类     class TrackBase : public AudioBufferProvider, public RefBase     基类AudioBufferProvider是一个对Buffer的封装，以后在AF读共享缓冲，写数据到硬件HAL中。  4. AF流程继续      这里终于在AF中的createTrack返回了TrackHandle。这个时候系统处于什么状态？AF中的几个Thread我们之前说了，在AF启动的某个时间就已经起来了。我们就假设AT调用AF服务前，这个线程就已经启动了。 这个可以看代码就知道了：     void AudioFlinger::PlaybackThread::onFirstRef() {         const size_t SIZE = 256;         char buffer[SIZE];         snprintf(buffer, SIZE, "Playback Thread %p", this);         //onFirstRef，实际是RefBase的一个方法，在构造sp的时候就会被调用                                              //下面的run就真正创建了线程并开始执行threadLoop了         run(buffer, ANDROID_PRIORITY_URGENT_AUDIO);     } 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 28 
+到底执行哪个线程的threadLoop？是根据output句柄来查找线程的。 看看openOutput的实行，真正的线程对象创建是在那儿。     int AudioFlinger::openOutput(uint32_t *pDevices,...) {         if () {             //如果flags没有设置直接输出标准，或者format不是16bit，或者声道数不是2,              //则创建DirectOutputThread。             thread = new DirectOutputThread(this, output, ++mNextThreadId);         } else {             //创建的是最复杂的MixerThread              thread = new MixerThread(this, output, ++mNextThreadId);         }  1) MixerThread     非常重要的工作线程，看看它的构造函数。      MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger,                 AudioStreamOut* output, int id)      : PlaybackThread(audioFlinger, output, id), mAudioMixer(0)     {         mType = PlaybackThread::MIXER;         //混音器对象，传进去的两个参数是基类ThreadBase的，都为0，最终混音的数据都由它生成         mAudioMixer = new AudioMixer(mFrameCount, mSampleRate);     } 2) At调用start   //加到active track。start才会触发AudioTrackThread     此时，AT得到IAudioTrack对象后，调用start函数。     status_t AudioFlinger::TrackHandle::start() {         return mTrack->start();     }      果然，自己不干活，交给mTrack了，这个是PlayingThread createTrack_l得到的Track对象     status_t AudioFlinger::PlaybackThread::Track::start()  {         status_t status = NO_ERROR; 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 29 
+        sp<ThreadBase> thread = mThread.promote();         //这个Thread就是调用createTrack_l的那个thread对象，这里是MixerThread         if (thread != 0) {             Mutex::Autolock _l(thread->mLock);             int state = mState;             if (mState == PAUSED) {                 mState = TrackBase::RESUMING;             } else {                 mState = TrackBase::ACTIVE;             }             //把自己由加到addTrack_l了             //奇怪，我们之前在看createTrack_l的时候，不是已经有个map保存创建的track了             //这里怎么又出现了一个类似的操作？             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();             playbackThread->addTrack_l(this);  //加到active track。             return status;     } 看看这个addTrack_l函数     status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)     {         status_t status = ALREADY_EXISTS;         // set retry count for buffer fill         track->mRetryCount = kMaxTrackStartupRetries;         if (mActiveTracks.indexOf(track) < 0) {             mActiveTracks.add(track);//啊，原来是加入到活跃Track的数组啊             status = NO_ERROR;         }         //看到这个broadcast，一定要想到：恩，在不远处有那么一个线程正等着这个CV呢。         mWaitWorkCV.broadcast(); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 30 
+        return status;     }          start()是把某个track加入到PlayingThread的活跃Track队列，然后触发一个信号事件。由于这个事件是PlayingThread的内部成员变量，而PlayingThread又创建了一个线程，那么难道是那个线程在等待这个事件吗？这时候有一个活跃track，那个线程应该可以干活了吧？     这个线程是MixerThread。我们去看看它的线程函数threadLoop吧。     bool AudioFlinger::MixerThread::threadLoop() {         int16_t* curBuf = mMixBuffer;         Vector< sp<Track> > tracksToRemove;         while (!exitPending()){             processConfigEvents();             //Mixer进到这个循环中来             mixerStatus = MIXER_IDLE;             { // scope for mLock                 Mutex::Autolock _l(mLock);                 const SortedVector< wp<Track> >& activeTracks = mActiveTracks;                 //每次都取当前最新的活跃Track数组                 //下面是预备操作，返回状态看看是否有数据需要获取                 mixerStatus = prepareTracks_l(activeTracks, &tracksToRemove);             }             //LIKELY，是GCC的一个东西，可以优化编译后的代码, 就当做是TRUE吧             if (LIKELY(mixerStatus == MIXER_TRACKS_READY)) {                 // mix buffers...                 //调用混音器，把buf传进去，估计得到了混音后的数据了                 //curBuf是mMixBuffer，PlayingThread的内部buffer，在某个地方已经创建好了，                 //缓存足够大                 mAudioMixer->process(curBuf);                 sleepTime = 0;                 standbyTime = systemTime() + kStandbyTimeInNsecs; 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 31 
+            }             //有数据要写到硬件中，肯定不能sleep了呀             if (sleepTime == 0) {                 //把缓存的数据写到outPut中。这个mOutput是AudioStreamOut                 //由Audio HAL的那个对象创建得到                 int bytesWritten = (int)mOutput->write(curBuf, mixBufferSize);                 mStandby = false;             } else {                 usleep(sleepTime);//如果没有数据，那就休息吧..     } 3) MixerThread核心     AF的工作就是如此的精密。MixerThread的线程循环中，最重要的两个函数：     prepare_l和mAudioMixer->process，我们一一来看看。      prepare_l的功能是什么？根据当前活跃的track队列，来为混音器设置信息。可想而知，一个track必然在混音器中有一个对应的东西。我们待会分析AudioMixer的时候再详述。     为混音器准备好后，下面调用它的process函数     void AudioMixer::process(void* output) {         mState.hook(&mState, output);    //hook？难道是钩子函数？     }     hook是一个函数指针啊，在哪里赋值的？具体实现函数又是哪个？只能分析AudioMixer类了。 4) AudioMixer     AudioMixer实现在framework/base/libs/audioflinger/AudioMixer.cpp中      process__OneTrack16BitsStereoNoResampling     //单track，16bit双声道，不需要重采样,大部分是这种情况了     到现在，还没看到取共享内存里AT端write的数据。那只能到bufferProvider去看了。注意，这里用的是AudioBufferProvider基类，实际的对象是Track。它从AudioBufferProvider派生。我们用得是PlaybackThread的这个Track     status_t PlaybackThread::Track::getNextBuffer(AudioBufferProvider::Buffer*) { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 32 
+        //千呼万唤始出来，终于见到cblk了         audio_track_cblk_t* cblk = this->cblk();         //哈哈，看看数据准备好了没，         framesReady = cblk->framesReady();         if (LIKELY(framesReady)) {         } }     再看看释放缓冲的地方：releaseBuffer，这个直接在ThreadBase中实现了     void ThreadBase::TrackBase::releaseBuffer(AudioBufferProvider::Buffer* buffer)     {         buffer->raw = 0;         mFrameCount = buffer->frameCount;         step();         buffer->frameCount = 0;     }     看看step吧。mFrameCount表示我已经用完了这么多帧。     bool AudioFlinger::ThreadBase::TrackBase::step() {         bool result;         audio_track_cblk_t* cblk = this->cblk();         result = cblk->stepServer(mFrameCount);          //调用cblk的stepServer，更新服务端的使用位置         return result;     } 原来AudioTrack中write的数据，最终是这么被使用的呀！！！  2.2.4.3 再论共享audio_track_cblk_t     audio_track_cblk_t是一个环形buffer，环形buffer是？顺便解释下，audio_track_cblk_t的使用和我之前说的Lock,读/写，Unlock不太一样。为何？ (1)因为在AF代码中.有缓冲buffer方面的wait，MixThread只有当没有数据的时候会usleep一下。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 33 
+(2)如果有多个track，多个audio_track_cblk_t的话，假如又是采用wait信号的办法，那么由于pthread库缺乏 WaitForMultiObjects的机制，那么到底该等哪一个？这个问题是我们之前在做跨平台同步库的一个重要难题。 1. 写者的使用     写者就是AudioTrack端，在这个类中，叫user             buffer，获得写空间起始地址             framesAvailable，看看是否有空余空间             stepUser，更新user的位置。 2. 读者的使用     读者是AudioFlinger端，在这个类中叫server             framesReady，获得可读的位置             stepServer，更新读者的位置     看看这个类的定义：     struct audio_track_cblk_t {             Mutex lock;  //同步锁             Condition cv;  //CV             volatile uint32_t user;   //写者             volatile uint32_t server;   //读者             uint32_t userBase;   //写者起始位置             uint32_t serverBase;  //读者起始位置             void* buffers;   //指向FIFO的起始地址             uint32_t frameCount;               // Cache line boundary             uint32_t loopStart;    //循环起始             uint32_t loopEnd;    //循环结束             int loopCount;             uint8_t out;   //如果是Track的话，out就是1，表示输出。     }     注意这是volatile，跨进程的对象，看来这个volatile也是可以跨进程的嘛。 3. 写者分析     先用frameavail看看当前剩余多少空间，假设是第一次进来。读者还在那sleep呢。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 34 
+    uint32_t audio_track_cblk_t::framesAvailable() {         Mutex::Autolock _l(lock);         return framesAvailable_l();     }     int32_t audio_track_cblk_t::framesAvailable_l() {         uint32_t u = this->user; //当前写者位置，此时为0         uint32_t s = this->server; //当前读者位置，此时为0         if (out) { out为1             uint32_t limit = (s < loopStart) ? s : loopStart;             //我们不设循环播放时间吗。所以loopStart是初始值INT_MAX，所以limit=0             return limit + frameCount - u;             //返回0+frameCount-0，也就是全缓冲最大的空间。假设frameCount=1024帧         }      }     然后调用buffer获得其实位置，buffer就是得到一个地址位置。     void* audio_track_cblk_t::buffer(uint32_t offset) const {         return (int8_t *)this->buffers + (offset - userBase) * this->frameSize;     }     完了，我们更新写者，调用stepUser     uint32_t audio_track_cblk_t::stepUser(uint32_t frameCount) {         //framecount，表示我写了多少，假设这一次写了512帧         uint32_t u = this->user;   //user位置还没更新呢，此时u=0；         u += frameCount;   //u更新了，u=512         // Ensure that user is never ahead of server for AudioRecord         if (out) {             //没甚，计算下等待时间         }          //userBase还是初始值为0，可惜啊，我们只写了1024的一半, 所以userBase加不了         if (u >= userBase + this->frameCount) { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 35 
+            userBase += this->frameCount;             //但是这句话很重要，userBase也更新了。根据buffer函数的实现来看，似乎把这个             //环形缓冲铺直了....连绵不绝。         }         this->user = u;//喔，user位置也更新为512了，但是useBase还是0         return u;     }     好了，假设写者这个时候sleep了，而读者起来了。 4. 读者分析     uint32_t audio_track_cblk_t::framesReady() {         uint32_t u = this->user; //u为512         uint32_t s = this->server;//还没读呢，s为零         if (out) {             if (u < loopEnd) {                 return u - s;//loopEnd也是INT_MAX，所以这里返回512，表示有512帧可读了             } else {            Mutex::Autolock _l(lock);                 if (loopCount >= 0) {                     return (loopEnd - loopStart)*loopCount + u - s;                 } else {                     return UINT_MAX;                 }             }         } else {             return s - u;         }     } 使用完了，然后stepServer     bool audio_track_cblk_t::stepServer(uint32_t frameCount) { 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 36 
+        status_t err;         err = lock.tryLock();         uint32_t s = this->server;         s += frameCount; //读了512帧了，所以s=512         if (out) {         }         //没有设置循环播放嘛，所以不走这个         if (s >= loopEnd) {             s = loopStart;             if (--loopCount == 0) {                 loopEnd = UINT_MAX;                 loopStart = UINT_MAX;             }         }         //一样啊，把环形缓冲铺直了         if (s >= serverBase + this->frameCount) {             serverBase += this->frameCount;         }         this->server = s; //server为512了         cv.signal(); //读者读完了。触发下写者吧。         lock.unlock();         return true;     } 5. 真的是环形缓冲吗？ 环形缓冲是这样一个场景，现在buffer共1024帧。 假设：写者先写到1024帧, 读者读到512帧, 那么，写者还可以从头写512帧。 所以，我们得回头看看frameavail是不是把这512帧算进来了。     uint32_t audio_track_cblk_t::framesAvailable_l() {         uint32_t u = this->user; //1024 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 37 
+        uint32_t s = this->server;//512         if (out) {             uint32_t limit = (s < loopStart) ? s : loopStart;             return limit + frameCount - u;返回512，用上了！         }     } 再看看stepUser这句话     if (u >= userBase + this->frameCount) {u为1024，userBase为0，frameCount为1024          userBase += this->frameCount;//好，userBase也为1024了     } 看看buffer     return (int8_t *)this->buffers + (offset - userBase) * this->frameSize;     //offset是外界传入的基于user的一个偏移量。     //offset-userBase，得到的正式从头开始的那段数据空间。  2.2.5 Audio Policy 1. 目的        AudioPolicyService（APS）是个什么东西？为什么要有它的存在？下层的Audio HAL层又是怎么结合到Android中来的？更有甚者，问个实在问题：插入耳机后，声音又怎么从最开始的外放变成从耳机输出了？调节音量的时候到底是调节Music的还是调节来电音量呢？这些东西，在AF的流程中统统都没讲到。但是这些又是至关重要的。从策略（Policy）比流程更复杂和难懂。 1.1. AF和APS系统第一次起来后，到底干了什么。 1.2. 检测到耳机插入事件后，AF和APS的处理。 2. AF和APS的诞生        在framework\base\media\MediaServer\Main_MediaServer中:           int main(int argc, char** argv) {             //先创建audioFlinger             AudioFlinger::instantiate();             //再创建audioPolicyManager             AudioPolicyService::instantiate(); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 38 
+            ProcessState::self()->startThreadPool();             IPCThreadState::self()->joinThreadPool();           } 1) new AudioFlinger          instantiate内部会实例化一个对象，那直接看AF的构造函数.         AudioFlinger::AudioFlinger() : BnAudioFlinger(),             mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextUniqueId(1)        {                //注意mAudioHardware和 mNextUniqueId               mHardwareStatus = AUDIO_HW_IDLE;                //创建audio的HAL代表                mAudioHardware = AudioHardwareInterface::create();                mHardwareStatus = AUDIO_HW_INIT;                //下面的东西 不会使用APS，APS还没创建。                if (mAudioHardware->initCheck() == NO_ERROR) {                       mMode = AudioSystem::MODE_NORMAL;                       setMode(mMode);                       setMasterVolume(1.0f);                       setMasterMute(false);                }         感觉上，AF的构造函数就是创建了一个最重要的AudioHardWare的HAL代表。好像是没干什么策略上的事情：AF创建了一个AudioHardware的HAL对象。注意整个系统就这一个AudioHardware了。也就是说，不管是线控耳机，蓝牙耳机，麦克，外放等等，最后都会由这一个HAL统一管理。 2) new AudioPolicyService     AudioPolicyService(): BnAudioPolicyService() , mpPolicyManager(NULL)                  //策略管理器，很重要     {           // start tone playback thread    播放铃声的?           mTonePlaybackThread = new AudioCommandThread(String8(""));           // start audio commands thread  音频命令? 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 39 
+          mAudioCommandThread = new AudioCommandThread(                                             String8("ApmCommandThread"));          //注意AudioPolicyManagerBase的构造函数，把this传进去了。          mpPolicyManager = new AudioPolicyManagerBase(this);          // 根据系统属性来判断摄像机是否强制使用声音。是防止偷拍吗？         property_get("ro.camera.sound.forced", value, "0");         mpPolicyManager->setSystemProperty("ro.camera.sound.forced", value);    }     这里分析的是Audio Policy，而构造函数中又创建了一个AudioPolicyManagerBase，而且不同厂商还可以实现自己的AudioPolicyManager，看来这个对于音频策略有至关重要的作用了。     另外，AudioPolicyManagerBase的构造函数可是把APS传进去了。 3) AudioPolicyManagerBase     AudioPolicyManagerBase(AudioPolicyClientInterface *clientInterface)       : mPhoneState(AudioSystem::MODE_NORMAL) //这里有电话状态     {     mpClientInterface = clientInterface;        //保存APS对象            //下面这个意思就是把几种for_use的情况使用的设备全部置为NONE。            for (int i = 0; i < AudioSystem::NUM_FORCE_USE; i++) {                  mForceUse[i] = AudioSystem::FORCE_NONE;             }             // 目前可以的输出设备，耳机和外放：OR操作符，最终mAvailableOutputDevices=0x3             mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE |                         AudioSystem::DEVICE_OUT_SPEAKER;             //目前可用的输入设备，内置MIC             mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;             //创建一个AudioOutputDescriptor，并设置它的device为外设0x2             AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor();             outputDesc->mDevice = (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER;             //调用APS的openOutput，得到一个mHardwareOutput，实际就是线程index             mHardwareOutput = mpClientInterface->openOutput(&outputDesc->mDevice, 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 40 
+                    …);             addOutput(mHardwareOutput, outputDesc);  //mOutputs很重要             //更新了mHardwareOutput对应的输出设备，发命令给APS更新对应混音线程的输出设备             setOutputDevice(mHardwareOutput, AudioSystem::DEVICE_OUT_SPEAKER, true);             updateDeviceForStrategy();                          } ------>  mPhoneState(AudioSystem::MODE_NORMAL)    AudioSystem, Android如何管理音频系统的关键所在。位置在framework\base\include \media\AudioSystem.h中，定义了大量的枚举之类的东西来表达Google对音频系统的看法。 下面是audio_mode的定义         enum audio_mode {              MODE_INVALID = -2,   //无效mode              MODE_CURRENT = -1,   //当前mode，和音频设备的切换（路由）有关              MODE_NORMAL = 0,    //正常mode，没有电话和铃声              MODE_RINGTONE,    //收到来电信号了，此时会有铃声              MODE_IN_CALL,     //电话mode，这里表示已经建立通话了              NUM_MODES  // not a valid entry, denotes end-of-list        }; -------> AudioSystem::FORCE_NONE和AudioSystem::NUM_FORCE_USE        // device categories used for setForceUse()       enum forced_config {             FORCE_NONE,             FORCE_SPEAKER,             FORCE_HEADPHONES,             FORCE_BT_SCO,             FORCE_BT_A2DP,             FORCE_WIRED_ACCESSORY,             FORCE_BT_CAR_DOCK,             FORCE_BT_DESK_DOCK,             NUM_FORCE_CONFIG, 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 41 
+            FORCE_DEFAULT = FORCE_NONE       };       // usages used for setForceUse()       enum force_use {            FOR_COMMUNICATION,  // FORCE_SPEAKER,  FORCE_BT_SCO            FOR_MEDIA,  // FORCE_HEADPHONES, FORCE_BT_A2DP,  FORCE_WIRED_ACCESSORY            FOR_RECORD, //FORCE_BT_SCO, FORCE_WIRED_ACCESSORY            FOR_DOCK,  //BT_CAR_DOCK, BT_DESK_DOCK, WIRED_ACCESSORY            NUM_FORCE_USE      };     在setSpeakerPhoneOn(bool on)中：     public void setSpeakerphoneOn(boolean on){           if (on) {               //强制通话使用speaker               AudioSystem.setForceUse(AudioSystem.FOR_COMMUNICATION,                                AudioSystem.FORCE_SPEAKER);               mForcedUseForComm = AudioSystem.FORCE_SPEAKER;          } else {               AudioSystem.setForceUse(AudioSystem.FOR_COMMUNICATION,                                AudioSystem.FORCE_NONE);              mForcedUseForComm = AudioSystem.FORCE_NONE;          }     } ----->输入输出设备      android使用枚举audio_device定义了很多输入输出设备。 ------>AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor()]    注释： descriptor for audio outputs. Used to maintain current configuration of each opened audio output and keep track of the usage of this output by each audio stream type.      描述audio输出的，可以用来保存一些配置信息。      跟踪音频stream类型使用这个output的一些情况。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 42 
+------>mHardwareOutput = mpClientInterface->openOutput():      这里调用的是APS的openOutput，看看去：      audio_io_handle_t AudioPolicyService::openOutput(uint32_t *pDevices, ….)      {             sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();            return af->openOutput(pDevices, …);      } ------>AudioFlinger::openOutput()     int AudioFlinger::openOutput(uint32_t *pDevices, ….)  {          //传进来的值，*pDevices=0x2,代表外放，其他都为0          Mutex::Autolock _l(mLock);          AudioStreamOut *output = mAudioHardware->openOutputStream(*pDevices,   …. ) ;           mHardwareStatus = AUDIO_HW_IDLE;          if (output != 0) {              int id = nextUniqueId();            //走哪个分支？mAudioHardware->openOutputStream确实会更改指针对应的value。            //那几个值变成：format为PCM_16_BIT，channels为2，samplingRate为44100, 走else            if ((flags & AudioSystem::OUTPUT_FLAG_DIRECT) ||                              (format != AudioSystem::PCM_16_BIT) ||                              (channels != AudioSystem::CHANNEL_OUT_STEREO)) {                     thread = new DirectOutputThread(this, output, id, *pDevices);            } else {               //openOutput()，就会在AF中创建一个混音线程。所有外放的程序，输出都由外放stream                //混音线程来工作; 所有耳机的程序，输出都由耳机stream混音线程完成。                     thread = new MixerThread(this, output, id, *pDevices);               }         }           mPlaybackThreads.add(id, thread);  //将混音线程加到mPlaybackThreads         return id; //返回混音线程的索引. 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 43 
+    } ------>setOutputDevice(mHardwareOutput,...) void AudioPolicyManagerBase::setOutputDevice(audio_io_handle_t output, uint32_t device, bool force, int delayMs) {       //output=1, device为AudioSystem::DEVICE_OUT_SPEAKER, force为true        AudioOutputDescriptor *outputDesc = mOutputs.valueFor(output);        if (outputDesc->isDuplicated()) {            setOutputDevice(outputDesc->mOutput1->mId, device, force, delayMs);             setOutputDevice(outputDesc->mOutput2->mId, device, force, delayMs);             return;        }        uint32_t prevDevice = (uint32_t)outputDesc->device();   //0x3, 外放和耳机        outputDesc->mDevice = device;  //现在设置为外放        //popCount为2，因为device=0x2=0010       //mHardwareOutput实际上是AF返回的一个线程索引，那AMB怎么根据这样一个东西来管理所有的线程呢？果然，这里就比较了output是不是等于最初创建的线程索引。这就表明。虽然只有这么一个mHardwareOutput，但实际上还是能够操作其他output的！       if (output == mHardwareOutput && AudioSystem::popCount(device) == 2) {          setStrategyMute(STRATEGY_MEDIA, true, output);       //wait for the PCM output buffers to empty before proceeding with rest of the command          usleep(outputDesc->mLatency*2*1000);     }     // do the routing  设置路由，新的输出设备为外放     AudioParameter param = AudioParameter();     param.addInt(String8(AudioParameter::keyRouting), (int)device);     mpClientInterface->setParameters(mHardwareOutput, param.toString(), delayMs);     // update stream volumes according to new device     applyStreamVolumes(output, device, delayMs);     // if changing from a combined headset + speaker route, unmute media streams 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 44 
+    if (output == mHardwareOutput && AudioSystem::popCount(prevDevice) == 2) {         setStrategyMute(STRATEGY_MEDIA, false, output, delayMs);     } } ------>updateDeviceForStrategy()     void AudioPolicyManagerBase::updateDeviceForStrategy() {         for (int i = 0; i < NUM_STRATEGIES; i++) {              mDeviceForStrategy[i] = getDeviceForStrategy((routing_strategy)i, false);         }      }     枚举：enum routing_strategy {                      STRATEGY_MEDIA,                      STRATEGY_PHONE,                      STRATEGY_SONIFICATION,                      STRATEGY_DTMF,                      NUM_STRATEGIES              }; ------>getDeviceForStrategy() 3. 总结 总结下吧，AF和APS都创建完了，得到什么了吗？下面按先后顺序说说。     lAF创建了一个代表HAL对象的东西     lAPS创建了两个AudioCommandThread，一个用来处理命令，一个用来播放tone。     lAPS同时会创建AudioManagerBase，做为系统默认的音频管理     lAMB集中管理了策略上面的事情，同时会在AF的openOutput中创建一个混音线程。同时， AMB会更新一些策略上的安排。      另外，我们分析的AMB是Generic的，但不同厂商可以实现自己的策略。例如我可以设置只要有耳机，所有类型声音都从耳机出。    
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 45 
+     2.4.1.2  Audio系统的JNI代码 Android的Audio部分通过JNI向Java层提供接口，在Java层可以通过JNI接口完成Audio系统的大部分操作。 Audio JNI部分的代码路径为：frameworks/base/core/jni。 其中，主要实现的3个文件为：android_media_AudioSystem.cpp、android_media_AudioTrack.cpp和android_media_AudioRecord.cpp，它们分别对应了Android Java框架中的3个类的支持： android.media.AudioSystem：负责Audio系统的总体控制； android.media.AudioTrack：负责Audio系统的输出环节； android.media.AudioRecorder：负责Audio系统的输入环节。 在Android的Java层中，可以对Audio系统进行控制和数据流操作，对于控制操作，和底层的处理基本一致；但是对于数据流操作，由于Java不支持指针，因此接口被封装成了另外的形式。例如，对于音频输出，android_media_AudioTrack.cpp提供的是写字节和写短整型的接口类型。所定义的JNI接口native_write_byte和native_write_short，它们一般是通过调用AudioTrack的write()函数来完成的，只是在Java的数据类型和C++的指针中做了一步转换。      2.4.1.3  Audio系统的Java代码 Android的Audio系统的相关类在android.media 包中，Java部分的代码路径为： frameworks/base/media/java/android/media Audio系统主要实现了以下几个类：android.media.AudioSystem、android.media.AudioTrack、android.media.AudioRecorder、android.media.AudioFormat。前面的3个类和本地代码是对应的，AudioFormat提供了一些Audio相关类型的枚举值。 注意：在Audio系统的Java代码中，虽然可以通过AudioTrack和AudioRecorder的write()和read()接口，在 Java层对Audio的数据流进行操作。但是，更多的时候并不需要这样做，而是在本地代码中直接调用接口进行数据流的输入/输出，而Java层只进行控制类操作，不处理数据流。   2.4.2  Audio的硬件抽象层      2.4.2.1  Audio硬件抽象层（HAL）的接口定义 Audio的硬件抽象层是AudioFlinger和Audio硬件的接口，在各个系统的移植过程中可以有不同的实现方式。Audio硬件抽象层的接口路径为： hardware/libhardware_legacy/include/hardware_legacy/ C++文件路径：hardware/msm7k/libaudio/ 其中主要的文件为：AudioHardwareBase.h和AudioHardwareInterface.h。 Android中的Audio硬件抽象层可以基于Linux标准的ALSA或OSS音频驱动实现，也可以基于私有的Audio驱动接口来实现。在高通QSD8K平台上，采用私有的Audio驱动接口（设备节点名为/dev/msm_audio_ctl、/dev/msm_pcm_out、/dev/msm_pcm_in等，其功能基本上是类似于ALSA或OSS的pcm driver）。 在AudioHardwareInterface.h中的类：AudioStreamOut、AudioStreamIn和AudioHardwareInterface。AudioStreamOut和AudioStreamIn的主要定义如下所示： 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 46 
+class AudioStreamOut{ public:     virtual ~AudioStreamOut() = 0;     virtual status_t setVolume(float volume) = 0;     virtual ssize_t write(const void* buffer,size_t bytes) = 0;     //......省略部分内容 }; class AudioStreamIn { public:  virtual ~AudioStreamIn() = 0;  virtual status_t setGain(float gain) = 0;  virtual ssize_t read(void* buffer, ssize_t bytes) = 0;  //......省略部分内容 };  AudioStreamOut和AudioStreamIn分别对应了音频的输出环节和输入环节，其中负责数据流的接口分别是wirte()和read()，参数是一块内存的指针和长度；另外还有一些设置和获取接口。 Audio的硬件抽象层主体AudioHardwareInterface类的定义如下所示： class AudioHardwareInterface { public:     virtual status_t initCheck() = 0;     virtual status_t setVoiceVolume(float volume) = 0;     virtual status_t setMasterVolume(float volume) = 0;     virtual status_t setRouting(int mode, uint32_t routes) = 0;     virtual status_t getRouting(int mode, uint32_t* routes) = 0;     virtual status_t setMode(int mode) = 0;  virtual status_t getMode(int* mode) = 0;  //...... 省略部分内容  virtual AudioStreamOut* openOutputStream(//打开输出流) =0;  virtual AudioStreamIn* openInputStream(// 打开输入流) =0;  static AudioHardwareInterface* create();   //获取一个AudioHardware Interface类型的指针 };  在这个AudioHardwareInterface接口中，使用openOutputStream()和openInputStream()函数分别获取AudioStreamOut和AudioStreamIn两个类，它们作为音频输入/输出设备来使用。 此外，AudioHardwareInterface.h定义了C语言的接口来获取一个AudioHardware Interface类型的指针。 Extern "C" AudioHardwareInterface* createAudioHardware(void); 如果实现一个Android的硬件抽象层，则需要实现AudioHardwareInterface、AudioStreamOut和AudioStreamIn三个类，将代码编译成动态库libauido.so。AudioFlinger会连接这个动态库，并调用其中的 createAudioHardware()函数来获取接口。 在AudioHardwareBase.h中定义了类：AudioHardwareBase，它继承了AudioHardwareInterface，显然继承这个接口也可以实现Audio的硬件抽象层。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 47 
+提示：Android系统的Audio硬件抽象层可以通过继承类AudioHardwareInterface来实现，其中分为控制部分和输入/输出处理部分。        2.4.2.2   AudioFlinger中自带Audio硬件抽象层实现 在AudioFlinger中可以通过编译宏的方式选择使用哪一个Audio硬件抽象层。这些Audio硬件抽象层既可以作为参考设计，也可以在没有实际的Audio硬件抽象层（甚至没有Audio设备）时使用，以保证系统的正常运行。 在AudioFlinger的编译文件Android.mk中，具有如下的定义： ifeq ($(strip $(BOARD_USES_GENERIC_AUDIO)),true)     LOCAL_STATIC_LIBRARIES += libaudiointerface else     LOCAL_SHARED_LIBRARIES += libaudio endif LOCAL_MODULE:= libaudioflinger include $(BUILD_SHARED_LIBRARY)  定义的含义为：当宏BOARD_USES_GENERIC_AUDIO为true时，连接libaudiointerface.a静态库；当BOARD_USES_GENERIC_AUDIO为false时，连接libaudio.so动态库。在正常的情况下，一般是使用后者，即在另外的地方实现libaudio.so动态库，由AudioFlinger的库libaudioflinger.so来连接使用。 libaudiointerface.a也在这个Android.mk中生成，通过编译4个源文件（AudioHardwareGeneric.cpp、AudioHardwareStub.cpp、AudioDumpInterface.cpp、AudioHardwareInterface.cpp），生成了libaudiointerface.a静态库。其中AudioHardwareInterface.cpp负责实现基础类和管理，而AudioHardwareGeneric.cpp、AudioHardwareStub.cpp和AudioDumpInterface.cpp三个文件各自代表一种Auido硬件抽象层的实现。 AudioHardwareGeneric.cpp：实现基于特定驱动的通用Audio硬件抽象层； AudioHardwareStub.cpp：实现Audio硬件抽象层的一个桩； AudioDumpInterface.cpp：实现输出到文件的Audio硬件抽象层。 在AudioHardwareInterface.cpp中，实现了Audio硬件抽象层的创建函数AudioHardwareInterface::create()，根据GENERIC_AUDIO、DUMP_FLINGER_OUT等宏选择创建几个不同的Audio硬件抽象层，最后返回的接口均为AudioHardwareInterface类型的指针。 1) 用桩实现的Audio硬件抽象层 AudioHardwareStub.h和AudioHardwareStub.cpp是一个Android硬件抽象层的桩实现方式。这个实现不操作实际的硬件和文件，它所进行的是空操作，在系统没有实际的Audio设备时使用这个实现，来保证系统的正常工作。如果使用这个硬件抽象层，实际上Audio系统的输入和输出都将为空。 在实现过程中，为了保证声音可以输入和输出，这个桩实现的主要内容是实现AudioStreamOutStub和AudioStreamInStub类的读/写函数。如下所示： class AudioStreamOutStub : public AudioStreamOut {  public:      virtual status_t    set(int format, int channelCount, uint32_t sampleRate);      virtual uint32_t    sampleRate() const { return 44100; }      virtual size_t      bufferSize() const { return 4096; }      virtual int         channelCount() const { return 2; }  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 48 
+    virtual int         format() const { return AudioSystem::PCM_16_BIT; }      virtual uint32_t    latency() const { return 0; }      virtual status_t    setVolume(float volume) { return NO_ERROR; }      virtual ssize_t     write(const void* buffer, size_t bytes);      virtual status_t    standby();      virtual status_t    dump(int fd, const Vector<String16>& args);  };   class AudioStreamInStub : public AudioStreamIn {  public:      virtual status_t    set(int format, int channelCount, uint32_t sampleRate, AudioSystem::audio_in_acoustics acoustics);      virtual uint32_t    sampleRate() const { return 8000; }      virtual size_t      bufferSize() const { return 320; }      virtual int         channelCount() const { return 1; }      virtual int         format() const { return AudioSystem::PCM_16_BIT; }      virtual status_t    setGain(float gain) { return NO_ERROR; }      virtual ssize_t     read(void* buffer, ssize_t bytes);      virtual status_t    dump(int fd, const Vector<String16>& args);      virtual status_t    standby() { return NO_ERROR; }  };        上面实际上使用了最简单的模式，只是用固定的参数，如缓存区大小、采样率、通道数等，以及将一些函数直接无错误返回。       此外使用AudioHardwareStub类继承AudioHardwareBase, AudioHardwareBase又继承AudioHardwareInterface，所以AudioHardwareStub也就是继承AudioHardwareInterface。如下所示： class AudioHardwareStub : public  AudioHardwareBase  {  public:                          AudioHardwareStub();      virtual             ~AudioHardwareStub();      virtual status_t    initCheck();      virtual status_t    setVoiceVolume(float volume);      virtual status_t    setMasterVolume(float volume);       // mic mute      virtual status_t    setMicMute(bool state) { mMicMute = state;  return  NO_ERROR; }      virtual status_t    getMicMute(bool* state) { *state = mMicMute ; return NO_ERROR; }       virtual status_t    setParameter(const char* key, const char* value)              { return NO_ERROR; }       // create I/O streams      virtual AudioStreamOut* openOutputStream(                                  int format=0,  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 49 
+                                int channelCount=0,                                  uint32_t sampleRate=0,                                  status_t *status=0);       virtual AudioStreamIn* openInputStream(                                  int inputSource,                                  int format,                                  int channelCount,                                  uint32_t sampleRate,                                  status_t *status,                                  AudioSystem::audio_in_acoustics acoustics);   protected:      virtual status_t    doRouting() { return NO_ERROR; }      virtual status_t    dump(int fd, const Vector<String16>& args);               bool        mMicMute;  private:      status_t            dumpInternals(int fd, const Vector<String16>& args);  };   // ----------------------------------------------------------------------------   };       在实现过程中，为了保证声音可以输入和输出，这个庄实现的主要内容是实现AudioStreamOutStub和AudioStreamInStub类的读写函数。如下所示：       ssize_t AudioStreamOutStub::write(const void* buffer, size_t bytes)  {      // fake timing for audio output      usleep(bytes * 1000000 / sizeof(int16_t) / channelCount() / sampleRate());      return bytes;  } ssize_t AudioStreamInStub::read(void* buffer, ssize_t bytes)  {      // fake timing for audio input      usleep(bytes * 1000000 / sizeof(int16_t) / channelCount() / sampleRate());      memset(buffer, 0, bytes);      return bytes;  }  2) Android通用的Audio硬件抽象层 AudioHardwareGeneric.h和AudioHardwareGeneric.cpp是Android通用的一个Audio硬件抽象层。与前面的桩实现
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 50 
+不同，这是一个真正能够使用的Audio硬件抽象层，但是它需要Android的一种特殊的声音驱动程序的支持。 与前面类似，使用AudioStreamOutGeneric、AudioHardwareInGeneric、AudioHardwareGeneric这三个类分别继承Audio硬件抽象层的三个接口。如下所示： class AudioStreamOutGeneric : public AudioStreamOut {  public:                          AudioStreamOutGeneric() : mAudioHardware(0), mFd(-1) {}      virtual             ~AudioStreamOutGeneric();       virtual status_t    set(              AudioHardwareGeneric *hw,              int mFd,              int format,              int channelCount,              uint32_t sampleRate);       virtual uint32_t    sampleRate() const { return 44100; }      virtual size_t      bufferSize() const { return 4096; }      virtual int         channelCount() const { return 2; }      virtual int         format() const { return AudioSystem::PCM_16_BIT; }      virtual uint32_t    latency() const { return 20; }      virtual status_t    setVolume(float volume) { return INVALID_OPERATION; }      virtual ssize_t     write(const void* buffer, size_t bytes);      virtual status_t    standby();      virtual status_t    dump(int fd, const Vector<String16>& args);   private:      AudioHardwareGeneric *mAudioHardware;      Mutex   mLock;      int     mFd;  };   class AudioStreamInGeneric : public AudioStreamIn {  public:                          AudioStreamInGeneric() : mAudioHardware(0), mFd(-1) {}      virtual             ~AudioStreamInGeneric();       virtual status_t    set(              AudioHardwareGeneric *hw,              int mFd,  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 51 
+            int format,              int channelCount,              uint32_t sampleRate,              AudioSystem::audio_in_acoustics acoustics);       uint32_t    sampleRate() const { return 8000; }      virtual size_t      bufferSize() const { return 320; }      virtual int         channelCount() const { return 1; }      virtual int         format() const { return AudioSystem::PCM_16_BIT; }      virtual status_t    setGain(float gain) { return INVALID_OPERATION; }      virtual ssize_t     read(void* buffer, ssize_t bytes);      virtual status_t    dump(int fd, const Vector<String16>& args);      virtual status_t    standby() { return NO_ERROR; }   private:      AudioHardwareGeneric *mAudioHardware;      Mutex   mLock;      int     mFd;  };    class AudioHardwareGeneric : public AudioHardwareBase  {  public:                          AudioHardwareGeneric();      virtual             ~AudioHardwareGeneric();      virtual status_t    initCheck();      virtual status_t    setVoiceVolume(float volume);      virtual status_t    setMasterVolume(float volume);       // mic mute      virtual status_t    setMicMute(bool state);      virtual status_t    getMicMute(bool* state);       virtual status_t    setParameter(const char* key, const char* value)              { return NO_ERROR; }       // create I/O streams      virtual AudioStreamOut* openOutputStream(              int format=0,  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 52 
+            int channelCount=0,              uint32_t sampleRate=0,              status_t *status=0);       virtual AudioStreamIn* openInputStream(              int inputSource,              int format,              int channelCount,              uint32_t sampleRate,              status_t *status,              AudioSystem::audio_in_acoustics acoustics);               void            closeOutputStream(AudioStreamOutGeneric* out);              void            closeInputStream(AudioStreamInGeneric* in);  protected:      virtual status_t        doRouting() { return NO_ERROR; }      virtual status_t        dump(int fd, const Vector<String16>& args);   private:      status_t                dumpInternals(int fd, const Vector<String16>& args);       Mutex                   mLock;      AudioStreamOutGeneric   *mOutput;      AudioStreamInGeneric    *mInput;      int                     mFd;      bool                    mMicMute;  };   }; 在AudioHardwareGeneric.cpp的实现中，使用的驱动程序是/dev/eac，这是一个非标准程序，定义设备的路径如下所示： static char const * const kAudioDeviceName = "/dev/eac"; 对于Linux操作系统，这个驱动程序在文件系统中的节点主设备号为10，次设备号自动生成。 提示：eac是Linux中的一个misc驱动程序，作为Android的通用音频驱动，写设备表示放音，读设备表示录音。 在audioHardwareGeneric的构造函数中，打开这个驱动程序的设备节点。 AudioHardwareGeneric::AudioHardwareGeneric()      : mOutput(0), mInput(0),  mFd(-1), mMicMute(false)  {      mFd = ::open(kAudioDeviceName, O_RDWR);  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 53 
+} 这个音频设备是一个比较简单的驱动程序，没有很多设置接口，只是用读设备表示录音，写设备表示放音。放音和录音支持的都是16位的PCM。 ssize_t AudioStreamOutGeneric::write(const void* buffer, size_t bytes)  {      Mutex::Autolock _l(mLock);      return ssize_t(::write(mFd, buffer, bytes));  } ssize_t AudioStreamInGeneric::read(void* buffer, ssize_t bytes)  {      // FIXME: remove logging      LOGD("AudioStreamInGeneric::read(%p, %d) from fd %d", buffer, bytes, mFd);      AutoMutex lock(mLock);      if (mFd < 0) {          LOGE("Attempt to read from unopened device");          return NO_INIT;      }      return ::read(mFd, buffer, bytes);  } 虽然AudioHardwareGeneric是一个可以真正工作的Audio硬件抽象层，但是这种实现方式非常简单，不支持各种设置，参数也只能使用默认的。而且，这种驱动程序需要在Linux核心加入eac驱动程序的支持。 3) 提供Dump功能的Audio硬件抽象层 AudioDumpInterface.h和AudioDumpInterface.cpp是一个提供了Dump功能的Audio硬件抽象层，它所起到的作用就是将输出的Audio数据写入到文件中。 AudioDumpInterface本身支持Audio的输出功能，不支持输入功能。只实现了AudioStreamOut，没有实现AudioStreamIn，因此这个Audio硬件抽象层只支持输出功能，不支持输入功能。如下所示： class AudioStreamOutDump : public AudioStreamOut {  public:                          AudioStreamOutDump( AudioStreamOut* FinalStream);                          ~AudioStreamOutDump();                          virtual ssize_t     write(const void* buffer, size_t bytes);       virtual uint32_t    sampleRate() const { return mFinalStream->sampleRate(); }      virtual size_t      bufferSize() const { return mFinalStream->bufferSize(); }      virtual int         channelCount() const { return mFinalStream->channelCount(); }      virtual int         format() const { return mFinalStream->format(); }      virtual uint32_t    latency() const { return mFinalStream->latency(); }      virtual status_t    setVolume(float volume)                              { return mFinalStream->setVolume(volume); }  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 54 
+    virtual status_t    standby();      virtual status_t    dump(int fd, const Vector<String16>& args) { return mFinalStream->dump(fd, args); }      void                Close(void);   private:      AudioStreamOut      *mFinalStream;      FILE                *mOutFile;     // output file  };    class AudioDumpInterface : public AudioHardwareBase  {   public:                          AudioDumpInterface(AudioHardwareInterface* hw);      virtual AudioStreamOut* openOutputStream(                                  int format=0,                                  int channelCount=0,                                  uint32_t sampleRate=0,                                  status_t *status=0);      virtual             ~AudioDumpInterface();       virtual status_t    initCheck()                              {return mFinalInterface->initCheck();}      virtual status_t    setVoiceVolume(float volume)                              {return mFinalInterface->setVoiceVolume(volume);}      virtual status_t    setMasterVolume(float volume)                              {return mFinalInterface->setMasterVolume(volume);}       // mic mute      virtual status_t    setMicMute(bool state)                              {return mFinalInterface->setMicMute(state);}      virtual status_t    getMicMute(bool* state)                              {return mFinalInterface->getMicMute(state);}        virtual status_t    setParameter(const char* key, const char* value)                              {return mFinalInterface->setParameter(key, value);}   
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 55 
+    virtual AudioStreamIn* openInputStream(int inputSource, int format, int channelCount,              uint32_t sampleRate, status_t *status, AudioSystem::audio_in_acoustics acoustics)          { return mFinalInterface->openInputStream(inputSource, format, channelCount, sampleRate, status, acoustics); }       virtual status_t    dump(int fd, const Vector<String16>& args) { return mFinalInterface->dumpState(fd, args); }   protected:      virtual status_t    doRouting() {return mFinalInterface->setRouting(mMode, mRoutes[mMode]);}       AudioHardwareInterface  *mFinalInterface;      AudioStreamOutDump      *mStreamOut;   };  };  输出文件的名称被定义为： #define FLINGER_DUMP_NAME "/data/FlingerOut.pcm" 在audioDumpInterface.cpp的AudioStreamOut所实现的写函数中，写入的对象就是这个文件。如下所示： ssize_t AudioStreamOutDump::write(const void* buffer, size_t bytes)  {      ssize_t ret;       ret = mFinalStream->write(buffer, bytes);      if(!mOutFile && gFirst) {          gFirst = false;          // check if dump file exist          mOutFile = fopen(FLINGER_DUMP_NAME, "r");          if(mOutFile) {              fclose(mOutFile);              mOutFile = fopen(FLINGER_DUMP_NAME, "ab");          }      }      if (mOutFile) {          fwrite(buffer, bytes, 1, mOutFile);  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 56 
+    }      return ret; 如果文件是打开的，则使用追加方式写入。因此使用这个Audio硬件抽象层时，播放的内容（PCM）将全部被写入文件。而且这个类支持各种格式的输出，这取决于调用者的设置。 AudioDumpInterface并不是为了实际的应用使用的，而是为了调试使用的类。当进行音频播放器调试时，有时无法确认是解码器的问题还是 Audio输出单元的问题，这时就可以用这个类来替换实际的Audio硬件抽象层，将解码器输出的Audio的PCM数据写入文件中，由此可以判断解码器的输出是否正确。 提示：使用AudioDumpInterface音频硬件抽象层，可以通过/data/FlingerOut.pcm文件找到PCM的输出数据。        2.4.2.3 Audio硬件抽象层的真正实现 实现一个真正的Audio硬件抽象层，需要完成的工作和实现以上的硬件抽象层类似。 例如：可以基于Linux标准的音频驱动：OSS（Open Sound System）或者ALSA（Advanced Linux Sound Architecture）驱动程序来实现。 对于OSS驱动程序，实现方式和前面的AudioHardwareGeneric类似，数据流的读/写操作通过对/dev/dsp设备的读/写来完成；区别在于OSS支持了更多的ioctl来进行设置，还涉及通过/dev/mixer设备进行控制，并支持更多不同的参数。 对于ALSA驱动程序，实现方式一般不是直接调用驱动程序的设备节点，而是先实现用户空间的alsa-lib，然后Audio硬件抽象层通过调用alsa-lib来实现。 在实现Audio硬件抽象层时，对于系统中有多个Audio设备的情况，可由硬件抽象层自行处理setRouting()函数设定，例如，可以选择支持多个设备的同时输出，或者有优先级输出。对于这种情况，数据流一般来自AudioStreamOut::write()函数，可由硬件抽象层确定输出方法。对于某种特殊的情况，也有可能采用硬件直接连接的方式，此时数据流可能并不来自上面的write()，这样就没有数据通道，只有控制接口。 Audio硬件抽象层也是可以处理这种情况的。 2.4.3  audio HAL在Eclair/Froyo和Donut的差异 Android 2.1/2.2 (Eclair/Froyo)和 1.6 (Donut)的音频系统架构层次分别见图3和图4。 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 57 
+ 图3  可见Eclair/Froyo相比于Donut在audio HAL上最大的差异是增加了AudioPolicyService/AudioPolicyManager用于实现音频设备路由控制。在hardware/msm7k/libaudio-qsd8k/下增加的文件有AudioPolicyManager.h和AudioPolicyManager.cpp，实现了类AudioPolicyManager，相应地编译出的HAL库除了libaudio.so以外增加了libaudiopolicy.so。 在donut上，音频 设备路由控制是分散在各种应用程序、services及frameworks中，例如phone应用、AudioManager/AudioService、AudioFlinger；而在Eclair/Froyo中，统一集中在AudioPolicyManager（也称为routing manager）进行。应用程序发送切换路由的event给AudioManager，AudioManager再向routing manager发送请求，经由AudioPolicyService在audio HAL统一进行路由控制。RoutingManager也侦听来自phone应用等发出的广播intents。 Eclair/Froyo相比于Donut在音频系统的另一个变化是增加了对编码后的音频数据流（例如MP3数据流）的支持，也就是编码的数据流而不是PCM数据流可直接传给HAL，再由HAL传给硬件进行解码和播放，在高通平台上是支持硬件解码MP3、AAC等音频数据流的，但由于目前Android只支持non-tunnel模式音频播放，因此还无法用到。  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 58 
+ 图4 2.4.4 Android Policy Manger Android Policy Manager（APM）定义在多个音频实例（如电话通知、音频的播放、提示等）的并发规则。在APM规则中有一条定义哪一个音频实例获得设备来播放，这里这个音频实例被看作一个任务而设备被看作一种资源，每个音频实例都要被分配一个设备才能播放.APM就定义了一个优先级高的音频实例如何强制获得被某些优先级底音频实例使用的设备的规则，所有说ＡＰＭ就像一个资源管理者，能够使高优先级的任务从底优先级的任务获取资源，ＡＰＭ主要有以下职责，ＡＰＭ和其它模块的交互方式图５  管理不同的输入输出设备接口，如ＨＡＬ，Ａ２ＤＰ  管理不同的输入输出设备，如扬声器，耳机等  基于特定数据流选择和定义合适的路由策略  管理每个数据流的声音的设置    
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 59 
+ 图５ＡＰＭ和其它模块的交互方式     2.2.5  高通Android的Audio HAL实现方式     2.2.5.1高通的Android的Audio的架构  高通也是在遵循Google的框架来实现自己Audio的HAL。通过实现AudioStreamOut, AudioStreamIn 和audioHardwareBase（继承AudioHardwareInterface）来实现HAL，如图6。  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 60 
+     2.2.5.2 高通Android的Audio的具体实现 1) Audio HAL实现代码在 hardware/msm7k/libaudio-qsd8k,主要文件是AudioHardware.h和AudioHardware.cpp，编译生成库libaudio.so和libaudiopolicy.so；                                
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 61 
+图6  2) Audio HAl的代码实现符合Google架构，是通过定义AudioStreamOutMSM7xx、AudioStreamInMSM72xx、AudioHardware这三个类，这三个类通过AudioStreamOut, AudioStreamIn 和audioHardwareBase（继承AudioHardwareInterface）来实现自己的HAL，具体代码如下：   class AudioHardware : public  AudioHardwareBase  {      class AudioStreamOutMSM72xx;      class AudioStreamInMSM72xx;    public:                          AudioHardware();      virtual             ~AudioHardware();      virtual status_t    initCheck();        virtual status_t    setVoiceVolume(float volume);      virtual status_t    setMasterVolume(float volume);        virtual status_t    setMode(int mode);        // mic mute      virtual status_t    setMicMute(bool state);  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 62 
+    virtual status_t    getMicMute(bool* state);        virtual status_t    setParameters(const String8& keyValuePairs);      virtual String8     getParameters(const String8& keys);        // create I/O streams      virtual AudioStreamOut* openOutputStream(                                  uint32_t devices,                                  int *format=0,                                  uint32_t *channels=0,                                  uint32_t *sampleRate=0,                                  status_t *status=0);        virtual AudioStreamIn* openInputStream(                                    uint32_t devices,                                  int *format,                                  uint32_t *channels,                                  uint32_t *sampleRate,                                  status_t *status,  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 63 
+                                AudioSystem::audio_in_acoustics acoustics);        virtual    void        closeOutputStream(AudioStreamOut* out);      virtual    void        closeInputStream(AudioStreamIn* in);        virtual size_t getInputBufferSize(uint32_t sampleRate, int format, int channelCount);                   void        clearCurDevice() { mCurSndDevice = -1; }    protected:      virtual status_t    dump(int fd, const Vector<String16>& args);    private:        status_t    doAudioRouteOrMute(uint32_t device);      status_t    setMicMute_nosync(bool state);      status_t    checkMicMute();      status_t    dumpInternals(int fd, const Vector<String16>& args);      uint32_t    getInputSampleRate(uint32_t sampleRate);      bool        checkOutputStandby(); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 64 
+     status_t    get_mMode();      status_t    get_mRoutes();      status_t    set_mRecordState(bool onoff);      status_t    get_snd_dev();      status_t    doRouting(AudioStreamInMSM72xx *input);      AudioStreamInMSM72xx*   getActiveInput_l();      size_t      getBufferSize(uint32_t sampleRate, int channelCount);        class AudioStreamOutMSM72xx : public AudioStreamOut {      public:                              AudioStreamOutMSM72xx();          virtual             ~AudioStreamOutMSM72xx();                  status_t    set(AudioHardware* mHardware,                                  uint32_t devices,                                  int *pFormat,                                  uint32_t *pChannels,                                  uint32_t *pRate);          virtual uint32_t    sampleRate() const { return mSampleRate; }          // Changed to 1024 from 4800          virtual size_t      bufferSize() const { return mBufferSize; } 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 65 
+         virtual uint32_t    channels() const { return mChannels; }          virtual int         format() const { return AUDIO_HW_OUT_FORMAT; }          virtual uint32_t    latency() const { return (1000*AUDIO_HW_NUM_OUT_BUF*(bufferSize()/frameSize()))/sampleRate()+AUDIO_HW_OUT_LATENCY_MS; }          virtual status_t    setVolume(float left, float right) { return INVALID_OPERATION; }          virtual ssize_t     write(const void* buffer, size_t bytes);          virtual status_t    standby();          virtual status_t    dump(int fd, const Vector<String16>& args);                  bool        checkStandby();          virtual status_t    setParameters(const String8& keyValuePairs);          virtual String8     getParameters(const String8& keys);                  uint32_t    devices() { return mDevices; }          virtual status_t    getRenderPosition(uint32_t *dspFrames);          virtual status_t    openDriver();        private:                  AudioHardware* mHardware;                  int         mFd;                  int         mStartCount;  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 66 
+                int         mRetryCount;                  bool        mStandby;                  uint32_t    mDevices;                  uint32_t    mChannels;                  uint32_t    mSampleRate;                  size_t      mBufferSize;      };        class AudioStreamInMSM72xx : public AudioStreamIn {      public:          enum input_state {              AUDIO_INPUT_CLOSED,              AUDIO_INPUT_OPENED,              AUDIO_INPUT_STARTED          };                                AudioStreamInMSM72xx();          virtual             ~AudioStreamInMSM72xx();                  status_t    set(AudioHardware* mHardware,                                  uint32_t devices,  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 67 
+                                int *pFormat,                                  uint32_t *pChannels,                                  uint32_t *pRate,                                  AudioSystem::audio_in_acoustics acoustics);          virtual size_t      bufferSize() const { return mBufferSize; }          virtual uint32_t    channels() const { return mChannels; }          virtual int         format() const { return mFormat; }          virtual uint32_t    sampleRate() const { return mSampleRate; }          virtual status_t    setGain(float gain) { return INVALID_OPERATION; }          virtual ssize_t     read(void* buffer, ssize_t bytes);          virtual status_t    dump(int fd, const Vector<String16>& args);          virtual status_t    standby();          virtual status_t    setParameters(const String8& keyValuePairs);          virtual String8     getParameters(const String8& keys);          virtual unsigned int  getInputFramesLost() const { return 0; }                  uint32_t    devices() { return mDevices; }                  int         state() const { return mState; }        private:                  AudioHardware* mHardware;  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 68 
+                int         mFd;                  int         mState;                  int         mRetryCount;                  int         mFormat;                  uint32_t    mChannels;                  uint32_t    mSampleRate;                  size_t      mBufferSize;                  AudioSystem::audio_in_acoustics mAcoustics;                  uint32_t    mDevices;                  bool mFirstread;      };                static const uint32_t inputSamplingRates[];              bool        mRecordState;              bool        mInit;              bool        mMicMute;              bool        mBluetoothNrec;              uint32_t    mBluetoothIdTx;              uint32_t    mBluetoothIdRx;              AudioStreamOutMSM72xx*  mOutput;  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 69 
+            SortedVector <AudioStreamInMSM72xx*>   mInputs;                msm_bt_endpoint *mBTEndpoints;              int mNumBTEndpoints;              int mCurSndDevice;              uint32_t mVoiceVolume;              bool        mDualMicEnabled;              int         mTtyMode;         friend class AudioStreamInMSM72xx;              Mutex       mLock;              uint32_t        mRoutes[AudioSystem::NUM_MODES];  };  2.2.6三星Android的Audio HAL的实现方式     2.2.6.1三星Android的架构 三星的Audio HAL是基于ALSA驱动（/ dev/audio/）,也是通过继承AudioHardwareInterface,实现AudioStreamOut, AudioStreamIn 和audioHardwareBase（继承AudioHardwareInterface）来实现HAL。具体架构如图7。  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 70 
+                                                                                                                                                    图7                       2.2.6.2三星针对C110 Audio的HAl具体实现 1) Audio HAL 实现代码在external/libaudio/,等同于高通的hardware/msm7k/libaudio-qsd8k/,核心代码是AudioHardwareALSA.h、AudioHardwareALS.cpp, 编译生成libaudio.so和libaudiopolicy.so,C110平台Audio驱动只支持16位PCM数据格式，而高通平台则支持PCM、AMR NB、EVRC、QCELP、AAC等多种格式； 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 71 
+2) Audio HAl的代码实现符合Google架构，是通过定义AudioStreamOutALSA、AudioStreamInALSA、AudioHardwareALSA这三个类，这三个类通过AudioStreamOut, AudioStreamIn 和audioHardwareBase（继承AudioHardwareInterface）来实现自己的HAL，具体代码如下：   class AudioStreamOutALSA : public AudioStreamOut, public ALSAStreamOps      {          public:                                      AudioStreamOutALSA(AudioHardwareALSA *parent);              virtual                ~AudioStreamOutALSA();           status_t       set(int *format,        uint32_t *channelCount,        uint32_t *sampleRate){    return ALSAStreamOps::set(format, channelCount, sampleRate);       }                virtual uint32_t        sampleRate() const              {                  return ALSAStreamOps::sampleRate();              }   
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 72 
+             virtual size_t          bufferSize() const              {                  return ALSAStreamOps::bufferSize();              }                //virtual int             channelCount() const;              virtual uint32_t             channels() const;                virtual int             format() const              {                  return ALSAStreamOps::format();              }                virtual uint32_t        latency() const;                virtual ssize_t         write(const void *buffer, size_t bytes);              virtual status_t        dump(int fd, const Vector<String16>& args);              virtual status_t        setDevice(int mode, uint32_t newDevice, uint32_t audio_mode);       virtual status_t    setVolume(float left, float right); //Tushar: New arch  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 73 
+              status_t                setVolume(float volume);                status_t                standby();              bool                    isStandby();       virtual status_t    setParameters(const String8& keyValuePairs);     virtual String8     getParameters(const String8& keys);        virtual status_t    getRenderPosition(uint32_t *dspFrames);              private:              AudioHardwareALSA      *mParent;              bool                    mPowerLock;      };        class AudioStreamInALSA : public AudioStreamIn, public ALSAStreamOps      {          public:  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 74 
+                                    AudioStreamInALSA(AudioHardwareALSA *parent);              virtual                ~AudioStreamInALSA();         status_t       set(int *format,        uint32_t *channelCount,        uint32_t *sampleRate){    return ALSAStreamOps::set(format, channelCount, sampleRate);       }                virtual uint32_t        sampleRate() const {                  return ALSAStreamOps::sampleRate();              }                            virtual size_t          bufferSize() const              {                  return ALSAStreamOps::bufferSize();              }                virtual uint32_t             channels() const              {  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 75 
+                return ALSAStreamOps::channelCount();              }                virtual int             format() const              {                  return ALSAStreamOps::format();              }                virtual ssize_t         read(void* buffer, ssize_t bytes);              virtual status_t        dump(int fd, const Vector<String16>& args);              virtual status_t        setDevice(int mode, uint32_t newDevice, uint32_t audio_mode);                virtual status_t        setGain(float gain);                virtual status_t        standby();         virtual status_t    setParameters(const String8& keyValuePairs);       virtual String8     getParameters(const String8& keys);      virtual unsigned int  getInputFramesLost() const { return 0; } 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 76 
+           private:              AudioHardwareALSA *mParent;      };        class AudioHardwareALSA : public AudioHardwareBase      {          public:                                      AudioHardwareALSA();              virtual                ~AudioHardwareALSA();                /**               * check to see if the audio hardware interface has been initialized.               * return status based on values defined in include/utils/Errors.h               */              virtual status_t        initCheck();                /**               * put the audio hardware into standby mode to conserve power. Returns               * status based on include/utils/Errors.h 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 77 
+              */              virtual status_t        standby();                /** set the audio volume of a voice call. Range is between 0.0 and 1.0 */              virtual status_t        setVoiceVolume(float volume);                /**               * set the audio volume for all audio activities other than voice call.               * Range between 0.0 and 1.0. If any value other than NO_ERROR is returned,               * the software mixer will emulate this capability.               */              virtual status_t        setMasterVolume(float volume);                // mic mute              virtual status_t        setMicMute(bool state);              virtual status_t        getMicMute(bool* state);         /** This method creates and opens the audio hardware output stream */       virtual AudioStreamOut* openOutputStream(                                  uint32_t devices, 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 78 
+                                 int *format=0,                                  uint32_t *channels=0,                                  uint32_t *sampleRate=0,                                  status_t *status=0);       virtual    void        closeOutputStream(AudioStreamOut* out);         /** This method creates and opens the audio hardware input stream */       virtual AudioStreamIn* openInputStream(                                  uint32_t devices,                                  int *format,                                  uint32_t *channels,                                  uint32_t *sampleRate,                                  status_t *status,                                  AudioSystem::audio_in_acoustics acoustics);       virtual    void        closeInputStream(AudioStreamIn* in);                protected:              /** 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 79 
+              * doRouting actually initiates the routing. A call to setRouting               * or setMode may result in a routing change. The generic logic calls               * doRouting when required. If the device has any special requirements these               * methods can be overriden.               */              virtual status_t    doRouting();                virtual status_t    dump(int fd, const Vector<String16>& args);                friend class AudioStreamOutALSA;              friend class AudioStreamInALSA;                ALSAMixer          *mMixer;              AudioStreamOutALSA *mOutput;              AudioStreamInALSA  *mInput;            private:              Mutex               mLock;      };  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 80 
+      // ----------------------------------------------------------------------------    };    3) 此外在AudioHardwareALSA.h中还定义了类ALSAMixer、ALSAControl和ALSAStreamOps分别用来控制C110平新增的功能。  class AudioHardwareALSA;        // ----------------------------------------------------------------------------        class ALSAMixer      {          public:                                      ALSAMixer();              virtual                ~ALSAMixer();                bool                    isValid() { return !!mMixer[SND_PCM_STREAM_PLAYBACK]; }              status_t                setMasterVolume(float volume);              status_t                setMasterGain(float gain);    
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 81 
+            status_t                setVolume(uint32_t device, float volume);              status_t                setGain(uint32_t device, float gain);                status_t                setCaptureMuteState(uint32_t device, bool state);              status_t                getCaptureMuteState(uint32_t device, bool *state);              status_t                setPlaybackMuteState(uint32_t device, bool state);              status_t                getPlaybackMuteState(uint32_t device, bool *state);            private:              snd_mixer_t            *mMixer[SND_PCM_STREAM_LAST+1];      };        class ALSAControl      {          public:                                      ALSAControl(const char *device = "default");              virtual                ~ALSAControl();                status_t                get(const char *name, unsigned int &value, int index = 0);  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 82 
+            status_t                set(const char *name, unsigned int value, int index = -1);            private:              snd_ctl_t              *mHandle;      };        class ALSAStreamOps      {          protected:              friend class AudioStreamOutALSA;              friend class AudioStreamInALSA;                struct StreamDefaults              {                  const char *        devicePrefix;                  snd_pcm_stream_t    direction;       // playback or capture                  snd_pcm_format_t    format;                  int                 channels;                  uint32_t            sampleRate;                  unsigned int        latency;         // Delay in usec 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 83 
+                 unsigned int        bufferSize;      // Size of sample buffer              };                                        ALSAStreamOps();              virtual                ~ALSAStreamOps();                status_t                set(int *format,                                          uint32_t *channels,                                          uint32_t *rate);              virtual uint32_t        sampleRate() const;              status_t                sampleRate(uint32_t rate);              virtual size_t          bufferSize() const;              virtual int             format() const;       int       getAndroidFormat(snd_pcm_format_t format);                virtual int             channelCount() const;              status_t                channelCount(int channels);       uint32_t      getAndroidChannels(int channels);                                  status_t                open(int mode, uint32_t device); 
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 84 
+             void                    close();              status_t                setSoftwareParams();              status_t                setPCMFormat(snd_pcm_format_t format);              status_t                setHardwareResample(bool resample);                const char             *streamName();              virtual status_t        setDevice(int mode, uint32_t device, uint32_t audio_mode);                const char             *deviceName(int mode, uint32_t device);                void                    setStreamDefaults(StreamDefaults *dev) {                  mDefaults = dev;              }                Mutex                   mLock;            private:              snd_pcm_t              *mHandle;              snd_pcm_hw_params_t    *mHardwareParams;  
+系统分析 
+ 版本:           <0.1> 
+
+ 日期:  <2010年11月8日> 
+文档标号> 
+
+ Lenovo.com, 2010- Page 85 
+            snd_pcm_sw_params_t    *mSoftwareParams;              int                     mMode;              uint32_t                mDevice;                StreamDefaults         *mDefaults;  #ifdef SLSI_RESAMPLER                          uint32_t                mReqSampleRate;  #endif                  };  参考资料 1) 庄渭峰        高通HAL分析_20100929 2) 庄渭峰   SMDKC110分析_20101020 3) 韩超/梁泉，《Android系统原理及开发要点详解》，2010 4) Qualcomm，Android Eclair Overview (Version A), 2009.12 5) Qualcomm,  Android Policy Manager Quick Start Guide 2010.7 6) Qualcomm,  QSD8x50_linux_Audio_Overview   7) Samsung,   Audroid Android Open Source 8) Samsung,  Android Intro 
