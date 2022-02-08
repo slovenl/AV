@@ -5,14 +5,16 @@
 //include ':WangYiPlayer'   //网易ndk-player
 //include ':WangYiPush'   //网易ndk推流demo
 //include ':test'
-//include ':app'
-include ':splayer'
+include ':app'
+//include ':splayer'
 //include ':audio_channel_interface'  //全民k歌提供，底层音频组件
-include ':fdk_aac'
+//include ':fdk_aac'
 //include ':VideoChat'   //视频通话java层实现 demo
 //include ':openGLRender'
 //include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
-include ':ijkplayer'
+//include ':ijkplayer'
 //include ':webrtc_ns'  //webrtc噪声抑制模块
 rootProject.name = 'AV'
 
+//include ':FFmpegDecoder'
+//include ':live_video_player'
