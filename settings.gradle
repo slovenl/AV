@@ -18,3 +18,4 @@ rootProject.name = 'AV'
 
 //include ':FFmpegDecoder'
 //include ':live_video_player'
+//include ':video_recorder'
