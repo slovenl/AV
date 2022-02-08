@@ -8,6 +8,12 @@ android {
         applicationId "com.phuket.tour.audioplayer"
         minSdkVersion 14
         targetSdkVersion 30
+
+        sourceSets {
+            main {
+                jniLibs.srcDirs = ['src/main/jniLibs']
+            }
+        }
     }
 
     buildTypes {
@@ -19,5 +25,5 @@ android {
 }
 
 dependencies {
-    api 'com.android.support:support-v4:23.+'
+//    api 'com.android.support:support-v4:23.+'
 }

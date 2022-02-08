@@ -5,7 +5,7 @@
 //include ':WangYiPlayer'   //网易ndk-player
 //include ':WangYiPush'   //网易ndk推流demo
 //include ':test'
-include ':app'
+//include ':app'
 //include ':splayer'
 //include ':audio_channel_interface'  //全民k歌提供，底层音频组件
 //include ':fdk_aac'
@@ -18,9 +18,9 @@ rootProject.name = 'AV'
 
 //include ':FFmpegDecoder'
 //include ':live_video_player'
-//include ':video_recorder'
-include ':AudioPlayer'
-include ':AudioRecorder'
-include ':CameraPreview'
-include ':MediaCodecAudioEncoder'
-include ':Mp3Encoder'
+include ':video_recorder'
+//include ':AudioPlayer'
+//include ':AudioRecorder'
+//include ':CameraPreview'
+//include ':MediaCodecAudioEncoder'
+//include ':Mp3Encoder'

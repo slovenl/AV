@@ -1,16 +1,18 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
+    compileSdkVersion 30
     buildToolsVersion "30.0.3"
 
     defaultConfig {
         applicationId "com.phuket.tour.video_player"
         minSdkVersion 16
-        targetSdkVersion 18
+        targetSdkVersion 30
 
-        ndk {
-            moduleName "libsongstudio"
+        sourceSets {
+            main {
+                jniLibs.srcDirs = ['src/main/jniLibs']
+            }
         }
     }
 
@@ -23,5 +25,5 @@ android {
 }
 
 dependencies {
-    api 'com.android.support:support-v4:23.+'
+//    api 'com.android.support:support-v4:23.+'
 }

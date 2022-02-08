@@ -9,8 +9,10 @@ android {
         minSdkVersion 21
         targetSdkVersion 30
 
-        ndk {
-            moduleName "libsongstudio"
+        sourceSets {
+            main {
+                jniLibs.srcDirs = ['src/main/jniLibs']
+            }
         }
     }
 

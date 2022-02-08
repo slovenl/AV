@@ -9,8 +9,10 @@ android {
         minSdkVersion 18
         targetSdkVersion 30
 
-        ndk {
-            moduleName "libaudioencoder"
+        sourceSets {
+            main {
+                jniLibs.srcDirs = ['src/main/jniLibs']
+            }
         }
     }
 
