@@ -24,3 +24,4 @@ include ':video_recorder'
 //include ':CameraPreview'
 //include ':MediaCodecAudioEncoder'
 //include ':Mp3Encoder'
+//include ':videocompressor'  //视频压缩--完全java层代码实现，利用Mediacodec
