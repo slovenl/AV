@@ -1,3 +1,5 @@
+rootProject.name = 'AV'
+
 //include ':ZXKVideoPlayer'
 //include ':encryption'
 //include ':wangyiplayer'
@@ -11,10 +13,9 @@
 //include ':fdk_aac'
 //include ':VideoChat'   //视频通话java层实现 demo
 //include ':openGLRender'
-//include ':libwlplayer' //没啥过人之处。。比较简单的逻辑 check
 //include ':ijkplayer'
 //include ':webrtc_ns'  //webrtc噪声抑制模块
-rootProject.name = 'AV'
+
 
 //include ':FFmpegDecoder'
 //include ':live_video_player'
@@ -25,6 +26,10 @@ rootProject.name = 'AV'
 //include ':MediaCodecAudioEncoder'
 //include ':Mp3Encoder'
 //include ':videocompressor'  //视频压缩--完全java层代码实现，利用Mediacodec
+
+
 //include ':WlLivePusher'  //wl csdn推流
 //include ':NativeOpenglDemo' //wl opengl
-include ':ScreenRecorder' // android屏幕录制
+//include ':libwlplayer' //wl 没啥过人之处。。比较简单的逻辑 check
+
+//include ':ScreenRecorder' // android屏幕录制
