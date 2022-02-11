@@ -4,6 +4,21 @@
     <asm skipDebug="true" skipFrames="true" skipCode="false" expandFrames="false" />
     <groovy codeStyle="LEGACY" />
   </component>
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="ScreenRecorder/src/main/res/layout/activity_main.xml" value="0.2755208333333333" />
+        <entry key="ScreenRecorder/src/main/res/layout/activity_main1.xml" value="0.21354166666666666" />
+        <entry key="ScreenRecorder/src/main/res/layout/activity_main2.xml" value="0.2755208333333333" />
+        <entry key="ScreenRecorder/src/main/res/layout/activity_main3.xml" value="0.175" />
+        <entry key="ScreenRecorder/src/main/res/layout/floating_drawable_view.xml" value="0.2755208333333333" />
+        <entry key="ScreenRecorder/src/main/res/layout/menu_left_bottom.xml" value="0.2755208333333333" />
+        <entry key="ScreenRecorder/src/main/res/layout/menu_right_bottom.xml" value="0.2755208333333333" />
+        <entry key="ScreenRecorder/src/main/res/menu/menu_main.xml" value="0.2755208333333333" />
+        <entry key="video_recorder/src/main/res/layout/record_video_surfaceview_filter_activity.xml" value="0.2755208333333333" />
+      </map>
+    </option>
+  </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="true" project-jdk-name="1.8" project-jdk-type="JavaSDK" />
 </project>
